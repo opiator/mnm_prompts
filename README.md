@@ -1,36 +1,108 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MNM Prompts
 
-## Getting Started
+A simplified LLM prompt management and testing platform built with Next.js, inspired by Opik but focused on core features: prompts, datasets, and playground testing.
 
-First, run the development server:
+## Features
+
+### ✨ Core Features
+- **Prompts Management**: Create, version, and organize your LLM prompt templates
+- **Datasets**: Store test data with variables for prompt testing  
+- **Playground**: Interactive testing environment with multiple LLM providers
+- **Provider Support**: OpenAI and Anthropic integration
+
+### 🚀 Key Capabilities
+- **Variable Substitution**: Use `{{variable_name}}` syntax in prompts
+- **Version Control**: Track prompt changes with commit-like versioning
+- **Dataset Integration**: Automatically populate variables from datasets
+- **Model Comparison**: Test with different models and providers
+- **Real-time Testing**: Execute prompts and see results instantly
+
+## Quick Start
+
+### 1. Getting Started
+
+The development server should already be running. If not:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) with your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 2. Configure Providers
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Go to **Settings** page at [http://localhost:3000/settings](http://localhost:3000/settings)
+2. Add your API keys for OpenAI or Anthropic
+3. Test the configuration in the Playground
 
-## Learn More
+### 3. Create Your First Prompt
 
-To learn more about Next.js, take a look at the following resources:
+1. Go to **Prompts** page at [http://localhost:3000/prompts](http://localhost:3000/prompts)
+2. Click "New Prompt"
+3. Create a template with variables like: `You are a helpful assistant. Help with: {{question}}`
+4. Add tags and description
+5. Save the prompt
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 4. Create Test Data
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Go to **Datasets** page at [http://localhost:3000/datasets](http://localhost:3000/datasets)
+2. Click "New Dataset"
+3. Add items with data that matches your prompt variables
+4. For example: `{"question": "What is machine learning?"}`
 
-## Deploy on Vercel
+### 5. Test in Playground
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Go to **Playground** at [http://localhost:3000/playground](http://localhost:3000/playground)
+2. Select or paste a prompt template
+3. Choose a dataset to populate variables
+4. Select provider and model
+5. Click "Execute" to test
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Technologies Used
+
+- **Framework**: Next.js 14+ with App Router
+- **Database**: SQLite with Prisma ORM
+- **UI**: Tailwind CSS + shadcn/ui components
+- **State Management**: Zustand + TanStack Query
+- **LLM Integration**: OpenAI SDK, Anthropic SDK
+- **Forms**: React Hook Form + Zod validation
+
+## Current Status
+
+✅ **Completed Implementation:**
+- [x] Next.js project with TypeScript
+- [x] SQLite database with Prisma
+- [x] Complete API routes for prompts, datasets, providers
+- [x] Beautiful UI with shadcn/ui components
+- [x] Prompt management with versioning
+- [x] Dataset management
+- [x] Settings page for provider configuration
+- [x] Full playground interface with LLM integration
+- [x] Variable substitution system
+- [x] OpenAI and Anthropic provider support
+
+🎯 **Ready to Use:**
+The application is fully functional! Visit [http://localhost:3000](http://localhost:3000) to start using it.
+
+## Database Operations
+
+```bash
+# Apply schema changes (already done)
+npx prisma db push
+
+# Generate client (already done)
+npx prisma generate
+
+# Open database GUI
+npx prisma studio
+```
+
+## Next Steps
+
+You can now:
+1. **Add your API keys** in the Settings page
+2. **Create prompts** with variable templates
+3. **Build datasets** for testing different scenarios
+4. **Test in the playground** with real LLM providers
+
+The simplified architecture makes it easy to extend with additional features as needed!

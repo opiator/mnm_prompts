@@ -1,0 +1,73 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Prompt {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  description String?
+  tags        String?          // JSON array as string
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  versions    PromptVersion[]
+  
+  @@map("prompts")
+}
+
+model PromptVersion {
+  id               String   @id @default(cuid())
+  promptId         String
+  template         String
+  commit           String
+  changeDescription String?
+  metadata         String?  // JSON string
+  createdAt        DateTime @default(now())
+  
+  prompt    Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  
+  @@unique([promptId, commit])
+  @@map("prompt_versions")
+}
+
+model Dataset {
+  id          String        @id @default(cuid())
+  name        String        @unique
+  description String?
+  tags        String?       // JSON array as string
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  items       DatasetItem[]
+  
+  @@map("datasets")
+}
+
+model DatasetItem {
+  id        String   @id @default(cuid())
+  datasetId String
+  data      String   // JSON string
+  createdAt DateTime @default(now())
+  
+  dataset   Dataset  @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  
+  @@map("dataset_items")
+}
+
+model ProviderKey {
+  id        String   @id @default(cuid())
+  provider  String   @unique
+  name      String?
+  apiKey    String
+  baseUrl   String?
+  headers   String?  // JSON string for additional headers
+  createdAt DateTime @default(now())
+  
+  @@map("provider_keys")
+}
