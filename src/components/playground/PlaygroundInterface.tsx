@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,7 +19,7 @@ import { Separator } from '@/components/ui/separator';
 import { Play, Settings, AlertCircle } from 'lucide-react';
 import { useProviders } from '@/hooks/use-providers';
 import { usePrompts } from '@/hooks/use-prompts';
-import { useDatasets } from '@/hooks/use-datasets';
+import { useDatasets, useDataset } from '@/hooks/use-datasets';
 import { usePlaygroundExecution } from '@/hooks/use-playground';
 import { extractVariables, substituteVariables } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -39,6 +40,7 @@ const ANTHROPIC_MODELS = [
 ];
 
 export function PlaygroundInterface() {
+  const searchParams = useSearchParams();
   const [template, setTemplate] = useState('You are a helpful assistant. Help the user with: {{question}}');
   const [provider, setProvider] = useState('');
   const [model, setModel] = useState('');
@@ -53,15 +55,27 @@ export function PlaygroundInterface() {
   const { data: providers } = useProviders();
   const { data: prompts } = usePrompts();
   const { data: datasets } = useDatasets();
+  const { data: selectedDatasetData } = useDataset(selectedDataset);
   const playgroundMutation = usePlaygroundExecution();
+
+  // Handle URL parameter for pre-selecting a prompt
+  useEffect(() => {
+    const promptParam = searchParams.get('prompt');
+    if (promptParam && prompts) {
+      const prompt = prompts.find(p => p.id === promptParam);
+      if (prompt && prompt.versions && prompt.versions[0]) {
+        setTemplate(prompt.versions[0].template);
+        setSelectedPrompt(promptParam);
+      }
+    }
+  }, [searchParams, prompts]);
 
   const variables = extractVariables(template);
   const availableModels = provider === 'openai' ? OPENAI_MODELS : 
                          provider === 'anthropic' ? ANTHROPIC_MODELS : [];
 
   // Get current dataset items if dataset is selected
-  const currentDataset = datasets?.find(d => d.id === selectedDataset);
-  const datasetItems = currentDataset?.items || [];
+  const datasetItems = selectedDatasetData?.items || [];
   
   // Get variables from selected dataset item
   const currentDatasetItem = datasetItems.find(item => item.id === selectedDatasetItem);
@@ -71,8 +85,13 @@ export function PlaygroundInterface() {
       return acc;
     }, {} as Record<string, string>) : {};
 
-  // Final variables = manual + dataset
-  const finalVariables = { ...datasetVariables, ...manualVariables };
+  // Final variables = dataset + manual (manual overrides dataset only if not empty)
+  const finalVariables = { ...datasetVariables };
+  Object.entries(manualVariables).forEach(([key, value]) => {
+    if (value && value.trim() !== '') {
+      finalVariables[key] = value;
+    }
+  });
 
   const handlePromptSelect = (promptId: string) => {
     const prompt = prompts?.find(p => p.id === promptId);
@@ -80,6 +99,20 @@ export function PlaygroundInterface() {
       setTemplate(prompt.versions[0].template);
       setSelectedPrompt(promptId);
     }
+  };
+
+  const handleDatasetChange = (datasetId: string) => {
+    setSelectedDataset(datasetId);
+    // Reset selected item when dataset changes
+    setSelectedDatasetItem('');
+    // Clear manual variables to allow dataset values to show
+    setManualVariables({});
+  };
+
+  const handleDatasetItemChange = (itemId: string) => {
+    setSelectedDatasetItem(itemId);
+    // Clear manual variables when selecting dataset item so dataset values take precedence
+    setManualVariables({});
   };
 
   const handleExecute = async () => {
@@ -222,7 +255,7 @@ export function PlaygroundInterface() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Dataset</Label>
-                  <Select value={selectedDataset} onValueChange={setSelectedDataset}>
+                  <Select value={selectedDataset} onValueChange={handleDatasetChange}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select dataset..." />
                     </SelectTrigger>
@@ -240,7 +273,7 @@ export function PlaygroundInterface() {
                   <Label>Dataset Item</Label>
                   <Select 
                     value={selectedDatasetItem} 
-                    onValueChange={setSelectedDatasetItem}
+                    onValueChange={handleDatasetItemChange}
                     disabled={!selectedDataset}
                   >
                     <SelectTrigger>

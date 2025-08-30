@@ -6,9 +6,12 @@ import { Button } from '@/components/ui/button';
 import { useDatasets } from '@/hooks/use-datasets';
 import { DatasetsTable } from '@/components/datasets/DatasetsTable';
 import { CreateDatasetDialog } from '@/components/datasets/CreateDatasetDialog';
+import { EditDatasetDialog } from '@/components/datasets/EditDatasetDialog';
+import { Dataset } from '@/types';
 
 export default function DatasetsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [editingDataset, setEditingDataset] = useState<Dataset | null>(null);
   const { data: datasets, isLoading, error } = useDatasets();
 
   if (error) {
@@ -49,12 +52,21 @@ export default function DatasetsPage() {
           </div>
         </div>
       ) : (
-        <DatasetsTable datasets={datasets || []} />
+        <DatasetsTable 
+          datasets={datasets || []} 
+          onEditDataset={setEditingDataset}
+        />
       )}
 
       <CreateDatasetDialog 
         open={showCreateDialog} 
         onOpenChange={setShowCreateDialog} 
+      />
+
+      <EditDatasetDialog
+        open={!!editingDataset}
+        onOpenChange={(open) => !open && setEditingDataset(null)}
+        dataset={editingDataset}
       />
     </div>
   );

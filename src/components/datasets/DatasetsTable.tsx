@@ -10,14 +10,33 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Edit, Trash2 } from 'lucide-react';
 import { Dataset } from '@/types';
 import { formatDate } from '@/lib/utils';
+import { useDeleteDataset } from '@/hooks/use-datasets';
+import { toast } from 'sonner';
 
 interface DatasetsTableProps {
   datasets: Dataset[];
+  onEditDataset?: (dataset: Dataset) => void;
 }
 
-export function DatasetsTable({ datasets }: DatasetsTableProps) {
+export function DatasetsTable({ datasets, onEditDataset }: DatasetsTableProps) {
+  const deleteDatasetMutation = useDeleteDataset();
+
+  const handleDelete = async (dataset: Dataset) => {
+    if (!confirm(`Are you sure you want to delete "${dataset.name}"? This will also delete all items in this dataset.`)) {
+      return;
+    }
+
+    try {
+      await deleteDatasetMutation.mutateAsync(dataset.id);
+      toast.success('Dataset deleted successfully');
+    } catch (error) {
+      toast.error('Failed to delete dataset');
+    }
+  };
   if (datasets.length === 0) {
     return (
       <Card>
@@ -46,6 +65,7 @@ export function DatasetsTable({ datasets }: DatasetsTableProps) {
               <TableHead>Description</TableHead>
               <TableHead>Items</TableHead>
               <TableHead>Updated</TableHead>
+              <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -71,6 +91,28 @@ export function DatasetsTable({ datasets }: DatasetsTableProps) {
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   {formatDate(dataset.updatedAt)}
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-1">
+                    {onEditDataset && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onEditDataset(dataset)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => handleDelete(dataset)}
+                      disabled={deleteDatasetMutation.isPending}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
