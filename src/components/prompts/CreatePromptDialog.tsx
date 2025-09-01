@@ -35,6 +35,7 @@ const formSchema = z.object({
   template: z.string().min(1, 'Template is required'),
   tags: z.string().optional(),
   changeDescription: z.string().max(200, 'Change description too long').optional(),
+  responseSchema: z.string().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -75,6 +76,7 @@ export function CreatePromptDialog({ open, onOpenChange }: CreatePromptDialogPro
         template: data.template,
         tags,
         changeDescription: data.changeDescription || undefined,
+        responseSchema: data.responseSchema || undefined,
       });
 
       toast.success('Prompt created successfully');
@@ -203,6 +205,42 @@ Use this context: {{context}}`}
                   </FormControl>
                   <FormDescription>
                     Describe what this version does or what changed.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="responseSchema"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Response Schema (Optional)</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder={`{
+  "type": "object",
+  "properties": {
+    "answer": {
+      "type": "string",
+      "description": "The main response"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    }
+  },
+  "required": ["answer"]
+}`}
+                      className="resize-none font-mono text-xs"
+                      rows={6}
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    JSON Schema for structured output. When provided, the LLM will return responses matching this schema.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

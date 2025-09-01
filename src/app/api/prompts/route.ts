@@ -38,7 +38,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body: CreatePromptRequest = await request.json();
-    const { name, description, template, tags, changeDescription } = body;
+    const { name, description, template, tags, changeDescription, responseSchema } = body;
 
     if (!name || !template) {
       return NextResponse.json(
@@ -60,6 +60,7 @@ export async function POST(request: Request) {
             template,
             commit,
             changeDescription,
+            responseSchema,
           },
         },
       },

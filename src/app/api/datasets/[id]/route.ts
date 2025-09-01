@@ -5,11 +5,12 @@ import { CreateDatasetRequest } from '@/types';
 // GET /api/datasets/[id] - Get a specific dataset
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const dataset = await prisma.dataset.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         items: {
           orderBy: { createdAt: 'desc' },
@@ -50,14 +51,15 @@ export async function GET(
 // PUT /api/datasets/[id] - Update a dataset
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const body: CreateDatasetRequest = await request.json();
     const { name, description, tags } = body;
 
     const dataset = await prisma.dataset.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         name,
         description,
@@ -104,11 +106,12 @@ export async function PUT(
 // DELETE /api/datasets/[id] - Delete a dataset
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     await prisma.dataset.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ message: 'Dataset deleted successfully' });

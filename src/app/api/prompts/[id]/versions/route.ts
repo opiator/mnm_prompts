@@ -35,7 +35,7 @@ export async function POST(
 ) {
   try {
     const body: CreatePromptVersionRequest = await request.json();
-    const { template, changeDescription, metadata } = body;
+    const { template, changeDescription, metadata, responseSchema } = body;
 
     if (!template) {
       return NextResponse.json(
@@ -66,6 +66,7 @@ export async function POST(
         commit,
         changeDescription,
         metadata: metadata ? JSON.stringify(metadata) : null,
+        responseSchema,
       },
     });
 

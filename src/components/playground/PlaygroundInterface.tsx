@@ -16,13 +16,14 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Play, Settings, AlertCircle } from 'lucide-react';
+import { Play, Settings, AlertCircle, Copy, ChevronDown, ChevronRight } from 'lucide-react';
 import { useProviders } from '@/hooks/use-providers';
 import { usePrompts } from '@/hooks/use-prompts';
 import { useDatasets, useDataset } from '@/hooks/use-datasets';
 import { usePlaygroundExecution } from '@/hooks/use-playground';
 import { extractVariables, substituteVariables } from '@/lib/utils';
 import { toast } from 'sonner';
+import { PlaygroundResponse } from '@/types';
 
 const OPENAI_MODELS = [
   'gpt-4o',
@@ -50,7 +51,8 @@ export function PlaygroundInterface() {
   const [manualVariables, setManualVariables] = useState<Record<string, string>>({});
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(1000);
-  const [result, setResult] = useState<string>('');
+  const [result, setResult] = useState<PlaygroundResponse | null>(null);
+  const [showRawRequest, setShowRawRequest] = useState(false);
 
   const { data: providers } = useProviders();
   const { data: prompts } = usePrompts();
@@ -115,6 +117,16 @@ export function PlaygroundInterface() {
     setManualVariables({});
   };
 
+  const handleCopyRequest = () => {
+    if (result?.rawRequest) {
+      const requestText = `${result.rawRequest.method} ${result.rawRequest.url}\n\n` +
+        `Headers:\n${JSON.stringify(result.rawRequest.headers, null, 2)}\n\n` +
+        `Body:\n${JSON.stringify(result.rawRequest.body, null, 2)}`;
+      navigator.clipboard.writeText(requestText);
+      toast.success('Raw request copied to clipboard');
+    }
+  };
+
   const handleExecute = async () => {
     if (!provider || !model) {
       toast.error('Please select a provider and model');
@@ -123,6 +135,7 @@ export function PlaygroundInterface() {
 
     try {
       const response = await playgroundMutation.mutateAsync({
+        ...(selectedPrompt && { promptId: selectedPrompt }),
         template,
         provider,
         model,
@@ -133,7 +146,7 @@ export function PlaygroundInterface() {
         },
       });
 
-      setResult(response.content);
+      setResult(response);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Execution failed');
     }
@@ -214,7 +227,7 @@ export function PlaygroundInterface() {
                   value={template}
                   onChange={(e) => setTemplate(e.target.value)}
                   placeholder="Enter your prompt template here..."
-                  className="font-mono text-sm min-h-[200px]"
+                  className="font-mono text-sm min-h-[200px] max-h-[300px] resize-none overflow-y-auto"
                 />
               </div>
 
@@ -421,7 +434,7 @@ export function PlaygroundInterface() {
               <CardTitle className="text-base">Preview</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="bg-muted p-4 rounded-md font-mono text-sm whitespace-pre-wrap">
+              <div className="bg-muted p-4 rounded-md font-mono text-sm whitespace-pre-wrap max-h-[300px] overflow-y-auto">
                 {substituteVariables(template, finalVariables)}
               </div>
             </CardContent>
@@ -434,8 +447,69 @@ export function PlaygroundInterface() {
             </CardHeader>
             <CardContent>
               {result ? (
-                <div className="bg-muted p-4 rounded-md whitespace-pre-wrap">
-                  {result}
+                <div className="space-y-4">
+                  <div className="bg-muted p-4 rounded-md whitespace-pre-wrap max-h-[400px] overflow-y-auto">
+                    {result.content}
+                  </div>
+                  
+                  {result.usage && (
+                    <div className="flex gap-4 text-xs text-muted-foreground">
+                      <span>Tokens: {result.usage.totalTokens}</span>
+                      <span>Prompt: {result.usage.promptTokens}</span>
+                      <span>Completion: {result.usage.completionTokens}</span>
+                      <span>Model: {result.model}</span>
+                    </div>
+                  )}
+
+                  {result.rawRequest && (
+                    <div className="border-t pt-4">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowRawRequest(!showRawRequest)}
+                        className="mb-2"
+                      >
+                        {showRawRequest ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        Raw Network Request
+                      </Button>
+                      
+                      {showRawRequest && (
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center">
+                            <h4 className="font-medium text-sm">Request Details</h4>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleCopyRequest}
+                            >
+                              <Copy className="h-3 w-3 mr-1" />
+                              Copy
+                            </Button>
+                          </div>
+                          
+                          <div className="bg-muted p-3 rounded text-xs font-mono space-y-3">
+                            <div>
+                              <strong>URL:</strong> {result.rawRequest.method} {result.rawRequest.url}
+                            </div>
+                            
+                            <div>
+                              <strong>Headers:</strong>
+                              <pre className="mt-1 text-xs overflow-x-auto max-h-[150px] overflow-y-auto">
+{JSON.stringify(result.rawRequest.headers, null, 2)}
+                              </pre>
+                            </div>
+                            
+                            <div>
+                              <strong>Request Body:</strong>
+                              <pre className="mt-1 text-xs overflow-x-auto max-h-[200px] overflow-y-auto">
+{JSON.stringify(result.rawRequest.body, null, 2)}
+                              </pre>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">

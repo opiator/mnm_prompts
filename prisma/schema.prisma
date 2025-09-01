@@ -29,6 +29,7 @@ model PromptVersion {
   commit           String
   changeDescription String?
   metadata         String?  // JSON string
+  responseSchema   String?  // JSON schema for structured output
   createdAt        DateTime @default(now())
   
   prompt    Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)

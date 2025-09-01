@@ -35,6 +35,7 @@ const metadataSchema = z.object({
 const versionSchema = z.object({
   template: z.string().min(1, 'Template is required'),
   changeDescription: z.string().max(200, 'Change description too long').optional(),
+  responseSchema: z.string().optional(),
 });
 
 type MetadataFormData = z.infer<typeof metadataSchema>;
@@ -117,6 +118,7 @@ export default function PromptEditPage() {
         data: {
           template: data.template,
           changeDescription: data.changeDescription || undefined,
+          responseSchema: data.responseSchema || undefined,
         },
       });
 
@@ -319,6 +321,41 @@ export default function PromptEditPage() {
                                 placeholder="Describe what changed in this version..."
                               />
                             </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={versionForm.control}
+                        name="responseSchema"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Response Schema (Optional)</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                {...field}
+                                placeholder={`{
+  "type": "object",
+  "properties": {
+    "answer": {
+      "type": "string",
+      "description": "The main response"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    }
+  },
+  "required": ["answer"]
+}`}
+                                className="font-mono text-xs min-h-[150px]"
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              JSON Schema for structured output. When provided, the LLM will return responses matching this schema.
+                            </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}

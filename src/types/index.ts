@@ -53,6 +53,7 @@ export interface CreatePromptRequest {
   template: string;
   tags?: string[];
   changeDescription?: string;
+  responseSchema?: string;
 }
 
 export interface UpdatePromptRequest {
@@ -65,6 +66,7 @@ export interface CreatePromptVersionRequest {
   template: string;
   changeDescription?: string;
   metadata?: Record<string, any>;
+  responseSchema?: string; // JSON schema for structured output
 }
 
 export interface CreateDatasetRequest {
@@ -115,6 +117,12 @@ export interface PlaygroundResponse {
   };
   model: string;
   provider: string;
+  rawRequest?: {
+    url: string;
+    method: string;
+    headers: Record<string, string>;
+    body: any;
+  };
 }
 
 export type LLMProvider = 'openai' | 'anthropic';
