@@ -22,6 +22,7 @@ import { usePrompts } from '@/hooks/use-prompts';
 import { useDatasets, useDataset } from '@/hooks/use-datasets';
 import { usePlaygroundExecution } from '@/hooks/use-playground';
 import { extractVariables, substituteVariables } from '@/lib/utils';
+import { buildApiRequest } from '@/lib/api-request-builder';
 import { toast } from 'sonner';
 import { PlaygroundResponse } from '@/types';
 
@@ -49,9 +50,10 @@ export function PlaygroundInterface() {
   const [selectedDataset, setSelectedDataset] = useState('');
   const [selectedDatasetItem, setSelectedDatasetItem] = useState('');
   const [manualVariables, setManualVariables] = useState<Record<string, string>>({});
-  const [temperature, setTemperature] = useState(0.7);
-  const [maxTokens, setMaxTokens] = useState(1000);
+  const [temperature, setTemperature] = useState(0.2);
+  const [maxTokens, setMaxTokens] = useState(3000);
   const [result, setResult] = useState<PlaygroundResponse | null>(null);
+  const [currentRequest, setCurrentRequest] = useState<any | null>(null);
   const [showRawRequest, setShowRawRequest] = useState(false);
 
   const { data: providers } = useProviders();
@@ -118,10 +120,11 @@ export function PlaygroundInterface() {
   };
 
   const handleCopyRequest = () => {
-    if (result?.rawRequest) {
-      const requestText = `${result.rawRequest.method} ${result.rawRequest.url}\n\n` +
-        `Headers:\n${JSON.stringify(result.rawRequest.headers, null, 2)}\n\n` +
-        `Body:\n${JSON.stringify(result.rawRequest.body, null, 2)}`;
+    const requestToCopy = result?.rawRequest || currentRequest;
+    if (requestToCopy) {
+      const requestText = `${requestToCopy.method} ${requestToCopy.url}\n\n` +
+        `Headers:\n${JSON.stringify(requestToCopy.headers, null, 2)}\n\n` +
+        `Body:\n${JSON.stringify(requestToCopy.body, null, 2)}`;
       navigator.clipboard.writeText(requestText);
       toast.success('Raw request copied to clipboard');
     }
@@ -133,19 +136,52 @@ export function PlaygroundInterface() {
       return;
     }
 
-    try {
-      const response = await playgroundMutation.mutateAsync({
-        ...(selectedPrompt && { promptId: selectedPrompt }),
-        template,
-        provider,
-        model,
-        variables: finalVariables,
-        config: {
-          temperature,
-          maxTokens,
-        },
-      });
+    // Build and show request immediately
+    const requestPayload = {
+      ...(selectedPrompt && { promptId: selectedPrompt }),
+      template,
+      provider,
+      model,
+      variables: finalVariables,
+      config: {
+        temperature,
+        maxTokens,
+      },
+    };
 
+    // Generate the exact API request that will be made to OpenAI/Anthropic
+    const providerConfig = providers?.find(p => p.provider === provider);
+    
+    let rawRequest;
+    if (providerConfig) {
+      try {
+        rawRequest = buildApiRequest({
+          provider,
+          model,
+          template,
+          variables: finalVariables,
+          config: {
+            temperature,
+            maxTokens,
+            topP: 1
+          },
+          providerConfig: {
+            baseUrl: providerConfig.baseUrl,
+            apiKey: providerConfig.apiKey,
+            headers: providerConfig.headers
+          }
+        });
+      } catch (error) {
+        console.error('Failed to build API request preview:', error);
+        rawRequest = null;
+      }
+    }
+
+    setCurrentRequest(rawRequest);
+    setShowRawRequest(true); // Auto-expand to show the request
+
+    try {
+      const response = await playgroundMutation.mutateAsync(requestPayload);
       setResult(response);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Execution failed');
@@ -313,19 +349,16 @@ export function PlaygroundInterface() {
                       {variables.map((variable) => (
                         <div key={variable}>
                           <Label className="text-sm">{variable}</Label>
-                          <Input
+                          <Textarea
                             value={manualVariables[variable] || ''}
                             onChange={(e) => setManualVariables(prev => ({
                               ...prev,
                               [variable]: e.target.value
                             }))}
                             placeholder={datasetVariables[variable] || `Enter ${variable}...`}
+                            className="min-h-[80px] max-h-[200px] resize-none overflow-y-auto"
+                            rows={3}
                           />
-                          {datasetVariables[variable] && (
-                            <p className="text-xs text-muted-foreground">
-                              Dataset value: {datasetVariables[variable]}
-                            </p>
-                          )}
                         </div>
                       ))}
                     </div>
@@ -461,59 +494,68 @@ export function PlaygroundInterface() {
                     </div>
                   )}
 
-                  {result.rawRequest && (
-                    <div className="border-t pt-4">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowRawRequest(!showRawRequest)}
-                        className="mb-2"
-                      >
-                        {showRawRequest ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                        Raw Network Request
-                      </Button>
-                      
-                      {showRawRequest && (
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-center">
-                            <h4 className="font-medium text-sm">Request Details</h4>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={handleCopyRequest}
-                            >
-                              <Copy className="h-3 w-3 mr-1" />
-                              Copy
-                            </Button>
-                          </div>
-                          
-                          <div className="bg-muted p-3 rounded text-xs font-mono space-y-3">
-                            <div>
-                              <strong>URL:</strong> {result.rawRequest.method} {result.rawRequest.url}
-                            </div>
-                            
-                            <div>
-                              <strong>Headers:</strong>
-                              <pre className="mt-1 text-xs overflow-x-auto max-h-[150px] overflow-y-auto">
-{JSON.stringify(result.rawRequest.headers, null, 2)}
-                              </pre>
-                            </div>
-                            
-                            <div>
-                              <strong>Request Body:</strong>
-                              <pre className="mt-1 text-xs overflow-x-auto max-h-[200px] overflow-y-auto">
-{JSON.stringify(result.rawRequest.body, null, 2)}
-                              </pre>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   Execute a prompt to see the response here
+                </div>
+              )}
+
+              {/* Raw Request Section - Always show when available */}
+              {(result?.rawRequest || currentRequest) && (
+                <div className="border-t pt-4 px-6 pb-6">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowRawRequest(!showRawRequest)}
+                    className="mb-2"
+                  >
+                    {showRawRequest ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    Raw Network Request
+                  </Button>
+                  
+                  {showRawRequest && (
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <h4 className="font-medium text-sm">Request Details</h4>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleCopyRequest}
+                        >
+                          <Copy className="h-3 w-3 mr-1" />
+                          Copy
+                        </Button>
+                      </div>
+                      
+                      <div className="bg-muted p-3 rounded text-xs font-mono space-y-3">
+                        {(() => {
+                          const displayRequest = result?.rawRequest || currentRequest;
+                          return (
+                            <>
+                              <div>
+                                <strong>URL:</strong> {displayRequest.method} {displayRequest.url}
+                              </div>
+                              
+                              <div>
+                                <strong>Headers:</strong>
+                                <pre className="mt-1 text-xs overflow-x-auto max-h-[150px] overflow-y-auto">
+{JSON.stringify(displayRequest.headers, null, 2)}
+                                </pre>
+                              </div>
+                              
+                              <div>
+                                <strong>Request Body:</strong>
+                                <pre className="mt-1 text-xs overflow-x-auto max-h-[200px] overflow-y-auto">
+{JSON.stringify(displayRequest.body, null, 2)}
+                                </pre>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

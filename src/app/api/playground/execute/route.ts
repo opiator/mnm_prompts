@@ -4,6 +4,7 @@ import { PlaygroundRequest, PlaygroundResponse } from '@/types';
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { substituteVariables } from '@/lib/utils';
+import { buildApiRequest } from '@/lib/api-request-builder';
 
 export async function POST(request: Request) {
   try {
@@ -158,94 +159,199 @@ async function executeOpenAI(
     top_p: config.topP ?? 1,
   };
 
-  // Add structured output if schema is provided
-  if (responseSchema) {
-    try {
-      const schema = JSON.parse(responseSchema);
-      
-      // OpenAI requires root schema to be type "object", not "array"
-      // If we have an array schema, wrap it in an object
-      let processedSchema = schema;
-      if (schema.type === 'array') {
-        processedSchema = {
-          type: "object",
-          properties: {
-            items: {
-              ...schema,
-              description: schema.description || "Array of items matching the specified schema"
-            }
-          },
-          required: ["items"],
-          additionalProperties: false
+  let response;
+  // Construct endpoint, avoiding double /v1 if baseUrl already includes it
+  const baseUrl = providerConfig.baseUrl || 'https://api.openai.com';
+  const endpoint = baseUrl.endsWith('/v1') 
+    ? `${baseUrl}/responses` 
+    : `${baseUrl}/v1/responses`;
+
+  // Always use /v1/responses endpoint for OpenAI
+  try {
+    console.log('DEBUG: Always using OpenAI /v1/responses endpoint');
+    
+    // Prepare request for /v1/responses endpoint
+    const responsesParams = {
+      model,
+      input: requestMessages,
+      temperature: config.temperature ?? 0.7,
+      max_output_tokens: config.maxTokens ?? 1000,
+      top_p: config.topP ?? 1,
+      store: false,
+    };
+
+    // Add structured output if schema is provided
+    if (responseSchema) {
+      try {
+        const schema = JSON.parse(responseSchema);
+        console.log('DEBUG: Adding structured output schema');
+        console.log('DEBUG: Schema:', schema);
+        
+        responsesParams.text = {
+          format: {
+            type: "json_schema",
+            name: "structured_response", 
+            strict: true,
+            schema: schema  // Use original schema without wrapping
+          }
         };
-        console.log('DEBUG: Wrapped array schema in object for OpenAI compatibility');
+      } catch (error) {
+        console.warn('Invalid response schema, using regular text output:', error);
+      }
+    } else {
+      console.log('DEBUG: No response schema, using regular text output');
+    }
+
+    // Make direct HTTP call to /v1/responses
+    console.log(endpoint);
+    const httpResponse = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${providerConfig.apiKey}`,
+        ...((providerConfig.baseUrl && providerConfig.headers) || {})
+      },
+      body: JSON.stringify(responsesParams)
+    });
+
+    if (!httpResponse.ok) {
+      let errorMessage;
+      try {
+        const errorData = await httpResponse.json();
+        errorMessage = errorData.error?.message || httpResponse.statusText;
+      } catch {
+        errorMessage = `HTTP ${httpResponse.status}: ${httpResponse.statusText}`;
+      }
+      throw new Error(`OpenAI /v1/responses error: ${errorMessage}`);
+    }
+
+    const responseText = await httpResponse.text();
+    console.log('DEBUG: Raw response status:', httpResponse.status);
+    console.log('DEBUG: Raw response headers:', Object.fromEntries(httpResponse.headers.entries()));
+    console.log('DEBUG: Raw response body (first 500 chars):', responseText.substring(0, 500));
+    
+    try {
+      response = JSON.parse(responseText);
+      console.log('DEBUG: Successfully parsed /v1/responses JSON response');
+    } catch (parseError) {
+      console.error('DEBUG: Failed to parse /v1/responses JSON response');
+      console.error('DEBUG: Parse error:', parseError);
+      console.error('DEBUG: Full response body:', responseText);
+      throw new Error(`Invalid JSON response from /v1/responses endpoint: ${parseError.message}`);
+    }
+    
+  } catch (error) {
+    console.error('DEBUG: /v1/responses endpoint failed:', error);
+    throw error; // No fallback - let it fail so we can debug
+  }
+
+  // Use shared utility to build raw request for consistency with frontend
+  const rawRequest = buildApiRequest({
+    provider: 'openai',
+    model,
+    template: template || '',
+    variables: {},
+    config: {
+      temperature: config.temperature ?? 0.7,
+      maxTokens: config.maxTokens ?? 1000,
+      topP: config.topP ?? 1
+    },
+    providerConfig: {
+      baseUrl: providerConfig.baseUrl || undefined,
+      apiKey: providerConfig.apiKey || '',
+      headers: providerConfig.headers || {}
+    },
+    responseSchema,
+    messages
+  });
+
+  // Process response based on endpoint used
+  let content;
+  let responseId;
+  let usage;
+  let responseModel;
+
+  if (endpoint.includes('/responses')) {
+    // /v1/responses format
+    console.log('DEBUG: Processing /v1/responses response format');
+    responseId = response.id;
+    responseModel = response.model;
+    usage = response.usage ? {
+      promptTokens: response.usage.prompt_tokens,
+      completionTokens: response.usage.completion_tokens,
+      totalTokens: response.usage.total_tokens,
+    } : undefined;
+    
+    // Extract content from /v1/responses format
+    if (response.text && response.text.content) {
+      // Structured response - check if we need to unwrap array
+      let responseContent = response.text.content;
+      
+      // If we wrapped an array schema, unwrap it
+      if (responseSchema) {
+        try {
+          const originalSchema = JSON.parse(responseSchema);
+          if (originalSchema.type === 'array' && responseContent.items) {
+            // Unwrap the array from the wrapper object
+            responseContent = responseContent.items;
+            console.log('DEBUG: Unwrapped array from /v1/responses structured response');
+          }
+        } catch (error) {
+          console.warn('DEBUG: Could not unwrap array response, using as-is');
+        }
       }
       
-      requestParams.response_format = {
-        type: "json_schema",
-        json_schema: {
-          name: "structured_response",
-          schema: processedSchema,
-          strict: true
-        }
-      };
-      console.log('DEBUG: Added OpenAI structured output to request');
-      console.log('DEBUG: Original schema type:', schema.type);
-      console.log('DEBUG: Processed schema:', processedSchema);
-    } catch (error) {
-      console.warn('Invalid response schema, ignoring structured output:', error);
+      content = JSON.stringify(responseContent, null, 2);
+      console.log('DEBUG: Extracted structured content from /v1/responses');
+    } else if (response.text) {
+      // Regular text response
+      content = response.text;
+      console.log('DEBUG: Extracted text content from /v1/responses');
+    } else {
+      content = '';
+      console.warn('DEBUG: No content found in /v1/responses response');
     }
   } else {
-    console.log('DEBUG: No response schema for OpenAI, using regular completion');
-  }
+    // /chat/completions format (fallback)
+    console.log('DEBUG: Processing /chat/completions response format');
+    const choice = response.choices[0];
+    if (!choice) {
+      throw new Error('No response from OpenAI');
+    }
 
-  const response = await openai.chat.completions.create(requestParams);
+    responseId = response.id;
+    responseModel = response.model;
+    usage = response.usage ? {
+      promptTokens: response.usage.prompt_tokens,
+      completionTokens: response.usage.completion_tokens,
+      totalTokens: response.usage.total_tokens,
+    } : undefined;
 
-  // Capture raw request details (mask API key for security)
-  const rawRequest = {
-    url: `${providerConfig.baseUrl || 'https://api.openai.com'}/v1/chat/completions`,
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer sk-...${providerConfig.apiKey.slice(-4)}`,
-      ...((providerConfig.baseUrl && providerConfig.headers) || {})
-    },
-    body: requestParams
-  };
-
-  const choice = response.choices[0];
-  if (!choice) {
-    throw new Error('No response from OpenAI');
-  }
-
-  let content = choice.message.content || '';
-  
-  // If we wrapped an array schema, extract the array from the response
-  if (responseSchema) {
-    try {
-      const originalSchema = JSON.parse(responseSchema);
-      if (originalSchema.type === 'array') {
-        const parsed = JSON.parse(content);
-        if (parsed && parsed.items) {
-          // Extract the array from the wrapped object and stringify it
-          content = JSON.stringify(parsed.items, null, 2);
-          console.log('DEBUG: Extracted array from wrapped OpenAI response');
+    content = choice.message.content || '';
+    
+    // If we wrapped an array schema for chat completions, extract the array from the response
+    if (responseSchema) {
+      try {
+        const originalSchema = JSON.parse(responseSchema);
+        if (originalSchema.type === 'array') {
+          const parsed = JSON.parse(content);
+          if (parsed && parsed.items) {
+            // Extract the array from the wrapped object and stringify it
+            content = JSON.stringify(parsed.items, null, 2);
+            console.log('DEBUG: Extracted array from wrapped chat completion response');
+          }
         }
+      } catch (error) {
+        console.warn('DEBUG: Could not unwrap array response, returning as-is');
       }
-    } catch (error) {
-      console.warn('DEBUG: Could not unwrap array response, returning as-is');
     }
   }
 
   return {
-    id: response.id,
+    id: responseId,
     content,
-    usage: response.usage ? {
-      promptTokens: response.usage.prompt_tokens,
-      completionTokens: response.usage.completion_tokens,
-      totalTokens: response.usage.total_tokens,
-    } : undefined,
-    model: response.model,
+    usage,
+    model: responseModel,
     provider: 'openai',
     rawRequest,
   };
@@ -314,18 +420,25 @@ async function executeAnthropic(
 
   const response = await anthropic.messages.create(requestParams);
 
-  // Capture raw request details (mask API key for security)
-  const rawRequest = {
-    url: `${providerConfig.baseUrl || 'https://api.anthropic.com'}/v1/messages`,
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': `sk-...${providerConfig.apiKey.slice(-4)}`,
-      'anthropic-version': '2023-06-01',
-      ...((providerConfig.baseUrl && providerConfig.headers) || {})
+  // Use shared utility to build raw request for consistency with frontend
+  const rawRequest = buildApiRequest({
+    provider: 'anthropic',
+    model,
+    template: template || '',
+    variables: {},
+    config: {
+      temperature: config.temperature ?? 0.7,
+      maxTokens: config.maxTokens ?? 1000,
+      topP: config.topP ?? 1
     },
-    body: requestParams
-  };
+    providerConfig: {
+      baseUrl: providerConfig.baseUrl || undefined,
+      apiKey: providerConfig.apiKey || '',
+      headers: providerConfig.headers || {}
+    },
+    responseSchema,
+    messages
+  });
 
   // Handle structured output (tool calling) vs regular text
   let responseContent: string;
