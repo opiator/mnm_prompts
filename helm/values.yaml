@@ -1,0 +1,63 @@
+# Minimal values for lisa-app
+
+image:
+  repository: lisa-app
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicas: 2
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+  annotations: {}
+
+ingress:
+  enabled: false  # Set to false to disable ingress
+  host: lisa-app.local
+  certificateArn: ""
+
+# Environment variables
+env:
+  NODE_ENV: production
+  PORT: "3000"
+  HOSTNAME: "0.0.0.0"
+  NEXT_TELEMETRY_DISABLED: "1"
+  NEXT_PUBLIC_SITE_URL: "https://lisa-app.yourdomain.com"
+
+# Health check configuration
+healthcheck:
+  path: /healthcheck
+  
+  # Liveness probe - restarts container if failing
+  liveness:
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 3
+  
+  # Readiness probe - removes from service if failing
+  readiness:
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    successThreshold: 1
+    failureThreshold: 3
+  
+  # Startup probe - protects slow starting containers
+  startup:
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 30
+
+# Secrets - set these values
+secrets:
+  DATABASE_URL: ""
+  SUPABASE_URL: ""
+  SUPABASE_ANON_KEY: ""
+  SUPABASE_SERVICE_ROLE_KEY: ""
+  NEXTAUTH_SECRET: ""

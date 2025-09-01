@@ -5,11 +5,13 @@ import { UpdatePromptRequest } from '@/types';
 // GET /api/prompts/[id] - Get a specific prompt
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+    
     const prompt = await prisma.prompt.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         versions: {
           orderBy: { createdAt: 'desc' },
@@ -46,14 +48,15 @@ export async function GET(
 // PUT /api/prompts/[id] - Update a prompt
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const body: UpdatePromptRequest = await request.json();
     const { name, description, tags } = body;
 
     const prompt = await prisma.prompt.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         name,
         description,
@@ -104,11 +107,13 @@ export async function PUT(
 // DELETE /api/prompts/[id] - Delete a prompt
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+    
     await prisma.prompt.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ message: 'Prompt deleted successfully' });

@@ -171,7 +171,7 @@ async function executeOpenAI(
     console.log('DEBUG: Always using OpenAI /v1/responses endpoint');
     
     // Prepare request for /v1/responses endpoint
-    const responsesParams = {
+    const responsesParams: any = {
       model,
       input: requestMessages,
       temperature: config.temperature ?? 0.7,
@@ -237,7 +237,7 @@ async function executeOpenAI(
       console.error('DEBUG: Failed to parse /v1/responses JSON response');
       console.error('DEBUG: Parse error:', parseError);
       console.error('DEBUG: Full response body:', responseText);
-      throw new Error(`Invalid JSON response from /v1/responses endpoint: ${parseError.message}`);
+      throw new Error(`Invalid JSON response from /v1/responses endpoint: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
     }
     
   } catch (error) {

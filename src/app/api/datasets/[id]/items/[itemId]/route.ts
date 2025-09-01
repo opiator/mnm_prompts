@@ -4,19 +4,21 @@ import { prisma } from '@/lib/db';
 // DELETE /api/datasets/[id]/items/[itemId] - Delete a dataset item
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string; itemId: string } }
+  { params }: { params: Promise<{ id: string; itemId: string }> }
 ) {
   try {
+    const { id, itemId } = await params;
+    
     await prisma.datasetItem.delete({
       where: {
-        id: params.itemId,
-        datasetId: params.id,
+        id: itemId,
+        datasetId: id,
       },
     });
 
     // Update dataset's updatedAt
     await prisma.dataset.update({
-      where: { id: params.id },
+      where: { id },
       data: { updatedAt: new Date() },
     });
 
@@ -41,9 +43,10 @@ export async function DELETE(
 // PUT /api/datasets/[id]/items/[itemId] - Update a dataset item
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string; itemId: string } }
+  { params }: { params: Promise<{ id: string; itemId: string }> }
 ) {
   try {
+    const { id, itemId } = await params;
     const { data } = await request.json();
 
     if (!data) {
@@ -55,8 +58,8 @@ export async function PUT(
 
     const item = await prisma.datasetItem.update({
       where: {
-        id: params.itemId,
-        datasetId: params.id,
+        id: itemId,
+        datasetId: id,
       },
       data: {
         data: JSON.stringify(data),
@@ -65,7 +68,7 @@ export async function PUT(
 
     // Update dataset's updatedAt
     await prisma.dataset.update({
-      where: { id: params.id },
+      where: { id },
       data: { updatedAt: new Date() },
     });
 

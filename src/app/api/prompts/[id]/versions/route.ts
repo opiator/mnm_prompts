@@ -5,11 +5,13 @@ import { CreatePromptVersionRequest } from '@/types';
 // GET /api/prompts/[id]/versions - Get all versions of a prompt
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+    
     const versions = await prisma.promptVersion.findMany({
-      where: { promptId: params.id },
+      where: { promptId: id },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -31,9 +33,10 @@ export async function GET(
 // POST /api/prompts/[id]/versions - Create a new version of a prompt
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const body: CreatePromptVersionRequest = await request.json();
     const { template, changeDescription, metadata, responseSchema } = body;
 
@@ -46,7 +49,7 @@ export async function POST(
 
     // Check if prompt exists
     const prompt = await prisma.prompt.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!prompt) {
@@ -61,7 +64,7 @@ export async function POST(
 
     const version = await prisma.promptVersion.create({
       data: {
-        promptId: params.id,
+        promptId: id,
         template,
         commit,
         changeDescription,
@@ -72,7 +75,7 @@ export async function POST(
 
     // Update prompt's updatedAt
     await prisma.prompt.update({
-      where: { id: params.id },
+      where: { id },
       data: { updatedAt: new Date() },
     });
 

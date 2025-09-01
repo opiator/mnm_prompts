@@ -1,0 +1,81 @@
+# Production values for lisa-app
+
+# Namespace specification
+namespace: lisa-app
+
+image:
+  repository: 767624311656.dkr.ecr.eu-west-1.amazonaws.com/lisa-app
+  tag: latest
+  pullPolicy: Always
+
+replicas: 3
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+  annotations: {}
+
+ingress:
+  enabled: true  # Set to false to disable ingress
+  host: lisa.mnm.dev
+  certificateArn: ""
+  
+# Environment variables
+env:
+  NODE_ENV: production
+  PORT: "3000"
+  HOSTNAME: "0.0.0.0"
+  NEXT_TELEMETRY_DISABLED: "1"    # Add your public environment variables here
+
+# Health check configuration
+healthcheck:
+  path: /healthcheck
+  
+  # Liveness probe - restarts container if failing
+  liveness:
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 3
+  
+  # Readiness probe - removes from service if failing
+  readiness:
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    successThreshold: 1
+    failureThreshold: 3
+  
+  # Startup probe - protects slow starting containers
+  startup:
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 30
+
+# Resource limits for production
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+# Horizontal Pod Autoscaler configuration
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+

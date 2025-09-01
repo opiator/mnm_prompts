@@ -1,0 +1,72 @@
+# Development values for lisa-app
+
+image:
+  repository: lisa-app
+  tag: latest
+  pullPolicy: Always
+
+replicas: 1
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+  annotations: {}
+
+ingress:
+  enabled: false  # Set to false to disable ingress
+  host: lisa-app.local
+  certificateArn: ""
+
+# Environment variables
+env:
+  NODE_ENV: development
+  PORT: "3000"
+  HOSTNAME: "0.0.0.0"
+  NEXT_TELEMETRY_DISABLED: "1"
+  NEXT_PUBLIC_SITE_URL: "https://lisa-app-dev.yourdomain.com"
+
+# Health check configuration
+healthcheck:
+  path: /healthcheck
+  
+  # Liveness probe - restarts container if failing
+  liveness:
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    timeoutSeconds: 10
+    successThreshold: 1
+    failureThreshold: 5
+  
+  # Readiness probe - removes from service if failing
+  readiness:
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 5
+  
+  # Startup probe - protects slow starting containers
+  startup:
+    initialDelaySeconds: 30
+    periodSeconds: 15
+    timeoutSeconds: 10
+    successThreshold: 1
+    failureThreshold: 60
+
+# Resource limits for development
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+# Secrets - set these values
+secrets:
+  DATABASE_URL: ""
+  SUPABASE_URL: ""
+  SUPABASE_ANON_KEY: ""
+  SUPABASE_SERVICE_ROLE_KEY: ""
+  NEXTAUTH_SECRET: ""

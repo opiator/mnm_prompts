@@ -5,11 +5,13 @@ import { CreateDatasetItemRequest } from '@/types';
 // GET /api/datasets/[id]/items - Get all items in a dataset
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+    
     const items = await prisma.datasetItem.findMany({
-      where: { datasetId: params.id },
+      where: { datasetId: id },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -31,9 +33,10 @@ export async function GET(
 // POST /api/datasets/[id]/items - Add an item to a dataset
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const body: CreateDatasetItemRequest = await request.json();
     const { data } = body;
 
@@ -46,7 +49,7 @@ export async function POST(
 
     // Check if dataset exists
     const dataset = await prisma.dataset.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!dataset) {
@@ -58,14 +61,14 @@ export async function POST(
 
     const item = await prisma.datasetItem.create({
       data: {
-        datasetId: params.id,
+        datasetId: id,
         data: JSON.stringify(data),
       },
     });
 
     // Update dataset's updatedAt
     await prisma.dataset.update({
-      where: { id: params.id },
+      where: { id },
       data: { updatedAt: new Date() },
     });
 
