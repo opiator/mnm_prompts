@@ -1,24 +1,20 @@
 #!/bin/bash
 
-# Lisa App EKS Deployment Script
-# This script builds, pushes to ECR, and deploys the Lisa App to EKS
+# mnm-prompts EKS Deployment Script
+# This script builds, pushes to ECR, and deploys the mnm-prompts app to EKS
 
 set -e
 
 # Configuration
 AWS_REGION=${AWS_REGION:-"eu-west-1"}
 AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID:-""}
-ECR_REPOSITORY_NAME="lisa-app"
-IMAGE_NAME="lisa-app"
+ECR_REPOSITORY_NAME="mnm-prompts"
+IMAGE_NAME="mnm-prompts"
 TAG=${TAG:-"latest"}
-NAMESPACE=${NAMESPACE:-"lisa-app"}
+NAMESPACE=${NAMESPACE:-"mnm-prompts"}
 ENVIRONMENT=${ENVIRONMENT:-"development"}
-HELM_CHART_PATH="../../helm/lisa-app"
+HELM_CHART_PATH="./helm"
 CREATE_ECR_REPO=${CREATE_ECR_REPO:-"false"}
-
-# Supabase configuration (can be overridden via environment variables)
-NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL:-""}
-NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY:-""}
 
 # Colors for output
 RED='\033[0;31m'
@@ -86,13 +82,13 @@ check_prerequisites() {
     fi
     
     # Check if we're in the correct directory
-    if [ ! -f "package.json" ] || [ ! -f "next.config.mjs" ]; then
-        print_error "This script must be run from the lisa-app directory"
+    if [ ! -f "package.json" ] || [ ! -f "next.config.ts" ]; then
+        print_error "This script must be run from the mnm-prompts project root directory"
         exit 1
     fi
     
     # Check if Dockerfile exists in the root
-    if [ ! -f "../../Dockerfile" ]; then
+    if [ ! -f "Dockerfile" ]; then
         print_error "Dockerfile not found in project root"
         exit 1
     fi
@@ -160,26 +156,12 @@ authenticate_ecr() {
 build_image() {
     print_status "Building Docker image..."
     
-    # Check if Supabase environment variables are set
-    if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ] || [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
-        print_warning "Supabase environment variables not set. Build may fail if they're required."
-        print_info "Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables if needed."
-    fi
-    
-    # Build from the project root directory
-    cd ../..
-    
     # Build for linux/amd64 to ensure compatibility with EKS nodes
     docker buildx build \
         --platform linux/amd64 \
-        --build-arg NEXT_PUBLIC_SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL" \
-        --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
         -t ${IMAGE_NAME}:${TAG} .
     
     docker tag ${IMAGE_NAME}:${TAG} ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY_NAME}:${TAG}
-    
-    # Return to lisa-app directory
-    cd apps/lisa-app
     
     print_status "Docker image built successfully"
 }
@@ -311,7 +293,7 @@ cleanup_local_images() {
 
 # Main deployment function
 main() {
-    print_status "Starting Lisa App ECR + EKS deployment process..."
+    print_status "Starting mnm-prompts ECR + EKS deployment process..."
     print_status "Environment: $ENVIRONMENT"
     print_status "Namespace: $NAMESPACE"
     print_status "AWS Region: $AWS_REGION"
@@ -330,7 +312,7 @@ main() {
     show_status
     cleanup_local_images
     
-    print_status "Lisa App ECR + EKS deployment completed successfully!"
+    print_status "mnm-prompts ECR + EKS deployment completed successfully!"
 }
 
 # Parse command line arguments
@@ -360,14 +342,6 @@ while [[ $# -gt 0 ]]; do
             CREATE_ECR_REPO="true"
             shift
             ;;
-        --supabase-url)
-            NEXT_PUBLIC_SUPABASE_URL="$2"
-            shift 2
-            ;;
-        --supabase-anon-key)
-            NEXT_PUBLIC_SUPABASE_ANON_KEY="$2"
-            shift 2
-            ;;
         --help)
             echo "Usage: $0 [OPTIONS]"
             echo ""
@@ -378,8 +352,6 @@ while [[ $# -gt 0 ]]; do
             echo "  --namespace NAMESPACE Kubernetes namespace (default: default)"
             echo "  --environment ENV     Environment: development or production (default: development)"
             echo "  --create-ecr-repo     Create ECR repository if it doesn't exist"
-            echo "  --supabase-url URL    Supabase project URL"
-            echo "  --supabase-anon-key KEY Supabase anonymous key"
             echo "  --help                Show this help message"
             echo ""
             echo "Environment variables:"
@@ -389,18 +361,16 @@ while [[ $# -gt 0 ]]; do
             echo "  NAMESPACE                    Kubernetes namespace"
             echo "  ENVIRONMENT                  Environment"
             echo "  CREATE_ECR_REPO              Create ECR repository (true/false)"
-            echo "  NEXT_PUBLIC_SUPABASE_URL     Supabase project URL"
-            echo "  NEXT_PUBLIC_SUPABASE_ANON_KEY Supabase anonymous key"
             echo ""
             echo "Prerequisites:"
             echo "  - AWS CLI configured with appropriate permissions"
             echo "  - Docker installed and running"
             echo "  - kubectl configured for your EKS cluster"
             echo "  - Helm installed"
-            echo "  - Script must be run from the lisa-app directory"
+            echo "  - Script must be run from the mnm-prompts project root directory"
             echo ""
             echo "Example:"
-            echo "  $0 --environment production --tag v1.0.0 --namespace lisa-app"
+            echo "  $0 --environment production --tag v1.0.0 --namespace mnm-prompts"
             echo ""
             exit 0
             ;;

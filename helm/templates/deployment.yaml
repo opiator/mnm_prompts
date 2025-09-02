@@ -37,13 +37,6 @@ spec:
         {{- end }}
         {{- end }}
         {{- end }}
-        {{- if .Values.aws.secretsManager.enabled }}
-        - name: SUPABASE_SERVICE_ROLE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: {{ .Chart.Name }}-aws-secrets
-              key: SUPABASE_SERVICE_ROLE_KEY
-        {{- end }}
         livenessProbe:
           httpGet:
             path: {{ .Values.healthcheck.path }}

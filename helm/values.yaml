@@ -1,7 +1,7 @@
-# Minimal values for lisa-app
+# Minimal values for mnm-prompts
 
 image:
-  repository: lisa-app
+  repository: mnm-prompts
   tag: latest
   pullPolicy: IfNotPresent
 
@@ -15,7 +15,7 @@ service:
 
 ingress:
   enabled: false  # Set to false to disable ingress
-  host: lisa-app.local
+  host: mnm-prompts.local
   certificateArn: ""
 
 # Environment variables
@@ -24,11 +24,11 @@ env:
   PORT: "3000"
   HOSTNAME: "0.0.0.0"
   NEXT_TELEMETRY_DISABLED: "1"
-  NEXT_PUBLIC_SITE_URL: "https://lisa-app.yourdomain.com"
+  NEXT_PUBLIC_SITE_URL: "https://mnm-prompts.yourdomain.com"
 
 # Health check configuration
 healthcheck:
-  path: /healthcheck
+  path: /api/healthcheck
   
   # Liveness probe - restarts container if failing
   liveness:
@@ -57,7 +57,3 @@ healthcheck:
 # Secrets - set these values
 secrets:
   DATABASE_URL: ""
-  SUPABASE_URL: ""
-  SUPABASE_ANON_KEY: ""
-  SUPABASE_SERVICE_ROLE_KEY: ""
-  NEXTAUTH_SECRET: ""

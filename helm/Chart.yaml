@@ -1,5 +1,5 @@
 apiVersion: v2
-name: lisa-app
-description: Minimal Helm chart for lisa-app
+name: mnm-prompts
+description: Minimal Helm chart for mnm-prompts
 version: 1.0.0
 appVersion: "1.0.0"
