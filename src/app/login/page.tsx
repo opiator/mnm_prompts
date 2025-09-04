@@ -19,6 +19,7 @@ export default function LoginPage() {
     setError('');
 
     try {
+      console.log('Submitting password...');
       const response = await fetch('/api/auth', {
         method: 'POST',
         headers: {
@@ -27,15 +28,20 @@ export default function LoginPage() {
         body: JSON.stringify({ password }),
       });
 
+      console.log('Response status:', response.status);
       const data = await response.json();
+      console.log('Response data:', data);
 
       if (data.success) {
+        console.log('Authentication successful, redirecting...');
         router.push('/');
         router.refresh();
       } else {
+        console.log('Authentication failed:', data.error);
         setError(data.error || 'Invalid password');
       }
     } catch (err) {
+      console.error('Login error:', err);
       setError('An error occurred. Please try again.');
     } finally {
       setIsLoading(false);

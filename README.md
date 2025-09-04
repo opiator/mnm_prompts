@@ -61,7 +61,7 @@ Open [http://localhost:3000](http://localhost:3000) with your browser.
 
 ## Password Protection Setup
 
-The application includes basic password protection to restrict access. To set it up:
+The application includes **JWT-based password protection** to restrict access with enhanced security. To set it up:
 
 ### 1. Generate a Secure Token
 Run this command to generate a secure token:
@@ -75,22 +75,32 @@ Create a `.env.local` file in your project root with:
 # The password users will enter to access your site
 SITE_PASSWORD=your-chosen-password-here
 
-# The secure token (generated from step 1)
+# The secure signing key for JWT tokens (generated from step 1)
 AUTH_SECRET=your-generated-secret-here
 ```
 
 ### 3. How It Works
 - Users visiting any page will be redirected to `/login`
 - They must enter the password you set in `SITE_PASSWORD`
-- Upon successful authentication, they get a secure cookie
-- The cookie expires after 24 hours
+- Upon successful authentication, they get a **unique JWT token** (not a static cookie)
+- **Each login generates a different token** - much more secure than static values
+- **Tokens expire after 1 hour** for enhanced security
 - Users can logout using the button in the navigation
 
-### 4. Security Notes
+### 4. Security Features
+- **JWT-based authentication** with unique session tokens
+- **Automatic token expiration** (1 hour)
+- **Tamper-proof tokens** - can't be modified without knowing AUTH_SECRET
+- **No server-side session storage** - stateless authentication
+- **Version field** for future mass token invalidation
+- **Secure HTTP-only cookies** with proper flags
+
+### 5. Security Notes
 - Never commit `.env.local` to version control
 - Use different passwords/tokens for development and production
 - The `AUTH_SECRET` should be at least 32 characters long
-- Consider rotating tokens periodically in production
+- JWT tokens are signed but not encrypted - don't store sensitive data
+- Consider shorter expiration times (30 minutes) for higher security environments
 
 ## Technologies Used
 
