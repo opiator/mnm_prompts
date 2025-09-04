@@ -57,3 +57,12 @@ healthcheck:
 # Secrets - set these values
 secrets:
   DATABASE_URL: ""
+
+# AWS configuration
+aws:
+  region: eu-west-1
+  secretsManager:
+    enabled: false
+    appSecrets: ""
+  serviceAccount:
+    roleArn: ""

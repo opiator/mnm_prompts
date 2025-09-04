@@ -79,3 +79,10 @@ podDisruptionBudget:
   minAvailable: 2
 
 
+aws:
+  region: eu-west-1
+  secretsManager:
+    enabled: true
+    appSecrets: mnm-prompts-prod-secrets
+  serviceAccount:
+    roleArn: arn:aws:iam::767624311656:role/mnm-prompts-secrets-role 

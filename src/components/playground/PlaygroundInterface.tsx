@@ -178,7 +178,7 @@ export function PlaygroundInterface() {
     }
 
     setCurrentRequest(rawRequest);
-    setShowRawRequest(true); // Auto-expand to show the request
+    // Don't auto-expand the raw request box
 
     try {
       const response = await playgroundMutation.mutateAsync(requestPayload);

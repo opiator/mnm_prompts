@@ -37,6 +37,11 @@ spec:
         {{- end }}
         {{- end }}
         {{- end }}
+        {{- if .Values.aws.secretsManager.enabled }}
+        envFrom:
+        - secretRef:
+            name: {{ .Chart.Name }}-app-secrets
+        {{- end }}
         livenessProbe:
           httpGet:
             path: {{ .Values.healthcheck.path }}
