@@ -8,7 +8,7 @@ image:
   tag: latest
   pullPolicy: Always
 
-replicas: 3
+replicas: 2
 
 service:
   type: ClusterIP
@@ -68,8 +68,8 @@ resources:
 # Horizontal Pod Autoscaler configuration
 autoscaling:
   enabled: true
-  minReplicas: 3
-  maxReplicas: 10
+  minReplicas: 2
+  maxReplicas: 2
   targetCPUUtilizationPercentage: 70
   targetMemoryUtilizationPercentage: 80
 

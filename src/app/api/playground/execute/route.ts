@@ -167,6 +167,13 @@ async function executeOpenAI(
     : `${baseUrl}/v1/responses`;
 
   // Always use /v1/responses endpoint for OpenAI
+  
+  // Declare variables for response processing
+  let content: string = '';
+  let responseId: string = '';
+  let responseModel: string = '';
+  let usage: any = undefined;
+  
   try {
     console.log('DEBUG: Always using OpenAI /v1/responses endpoint');
     
@@ -183,18 +190,40 @@ async function executeOpenAI(
     // Add structured output if schema is provided
     if (responseSchema) {
       try {
-        const schema = JSON.parse(responseSchema);
-        console.log('DEBUG: Adding structured output schema');
-        console.log('DEBUG: Schema:', schema);
+        const originalSchema = JSON.parse(responseSchema);
+        let schema = originalSchema;
+        
+        console.log('DEBUG: Original schema type:', originalSchema.type);
+        console.log('DEBUG: Original schema:', JSON.stringify(originalSchema, null, 2));
+        
+        // For /v1/responses, OpenAI requires root schema to be object type
+        // If we have an array schema, wrap it in an object
+        if (originalSchema.type === 'array') {
+          schema = {
+            type: "object",
+            properties: {
+              items: originalSchema
+            },
+            required: ["items"],
+            additionalProperties: false
+          };
+          console.log('DEBUG: Wrapped array schema in object');
+        }
+        
+        console.log('DEBUG: Final schema being sent:', JSON.stringify(schema, null, 2));
+        
+        // Generate a descriptive name based on the schema
+        const responseName = originalSchema.title?.toLowerCase().replace(/[^a-z0-9]/g, '_') || "structured_response";
         
         responsesParams.text = {
           format: {
             type: "json_schema",
-            name: "structured_response", 
+            name: responseName, 
             strict: true,
-            schema: schema  // Use original schema without wrapping
+            schema: schema
           }
         };
+        console.log('DEBUG: Set responsesParams.text to:', JSON.stringify(responsesParams.text, null, 2));
       } catch (error) {
         console.warn('Invalid response schema, using regular text output:', error);
       }
@@ -240,6 +269,106 @@ async function executeOpenAI(
       throw new Error(`Invalid JSON response from /v1/responses endpoint: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
     }
     
+    // Extract content from /v1/responses format
+    console.log('DEBUG: Full OpenAI response:', JSON.stringify(response, null, 2));
+    console.log('DEBUG: response.output exists:', !!response.output);
+    console.log('DEBUG: response.output length:', response.output?.length);
+    
+    // Check for the correct response structure: response.output[0].content[0].text
+    if (response.output && response.output.length > 0 && 
+        response.output[0].content && response.output[0].content.length > 0) {
+      
+      const outputText = response.output[0].content[0].text;
+      console.log('DEBUG: Found output text:', outputText);
+      
+      if (outputText) {
+        // Parse the JSON string from the text field
+        try {
+          let responseContent = JSON.parse(outputText);
+          console.log('DEBUG: Parsed response content:', responseContent);
+          
+          // If we wrapped an array schema, unwrap it
+          if (responseSchema) {
+            try {
+              const originalSchema = JSON.parse(responseSchema);
+              if (originalSchema.type === 'array' && responseContent && typeof responseContent === 'object') {
+                // Check for common wrapper property names
+                if ('items' in responseContent) {
+                  responseContent = (responseContent as any).items;
+                  console.log('DEBUG: Unwrapped array from /v1/responses structured response using "items" property');
+                } else if ('classifications' in responseContent) {
+                  responseContent = (responseContent as any).classifications;
+                  console.log('DEBUG: Unwrapped array from /v1/responses structured response using "classifications" property');
+                } else if ('results' in responseContent) {
+                  responseContent = (responseContent as any).results;
+                  console.log('DEBUG: Unwrapped array from /v1/responses structured response using "results" property');
+                } else {
+                  console.log('DEBUG: Array schema detected but no known wrapper property found, using response as-is');
+                }
+              }
+            } catch (error) {
+              console.warn('DEBUG: Could not unwrap array response, using as-is');
+            }
+          }
+          
+          content = JSON.stringify(responseContent, null, 2);
+          console.log('DEBUG: Extracted structured content from /v1/responses');
+        } catch (parseError) {
+          console.error('DEBUG: Failed to parse output text as JSON:', parseError);
+          content = outputText; // Fallback to raw text
+        }
+      } else {
+        content = '';
+        console.warn('DEBUG: No text found in output content');
+      }
+    } else {
+      // Fallback: check if response has a different structure
+      console.log('DEBUG: No output structure found, checking for alternative response format...');
+      console.log('DEBUG: Response structure analysis:');
+      console.log('DEBUG: - response has output property:', 'output' in response);
+      console.log('DEBUG: - response has text property:', 'text' in response);
+      console.log('DEBUG: - response has choices property:', 'choices' in response);
+      console.log('DEBUG: - response has content property:', 'content' in response);
+      
+      if ('text' in response && response.text) {
+        // Check if response.text has the old structure
+        if (response.text.content) {
+          let responseContent = response.text.content;
+          content = JSON.stringify(responseContent, null, 2);
+          console.log('DEBUG: Found content in response.text.content format');
+        } else if (typeof response.text === 'string') {
+          content = response.text;
+          console.log('DEBUG: Found content in response.text as string');
+        } else {
+          content = JSON.stringify(response.text, null, 2);
+          console.log('DEBUG: Found content in response.text as object');
+        }
+      } else if ('choices' in response && response.choices && response.choices.length > 0) {
+        // Fallback to chat completions format
+        const choice = response.choices[0];
+        if (choice && choice.message) {
+          content = choice.message.content || '';
+          console.log('DEBUG: Found content in choices[0].message.content format');
+        }
+      } else if ('content' in response) {
+        // Direct content property
+        content = typeof response.content === 'string' ? response.content : JSON.stringify(response.content, null, 2);
+        console.log('DEBUG: Found content in direct content property');
+      } else {
+        content = '';
+        console.warn('DEBUG: No recognizable content found in /v1/responses response');
+      }
+    }
+    
+    // Set response metadata
+    responseId = response.id;
+    responseModel = response.model;
+    usage = response.usage ? {
+      promptTokens: response.usage.prompt_tokens,
+      completionTokens: response.usage.completion_tokens,
+      totalTokens: response.usage.total_tokens,
+    } : undefined;
+    
   } catch (error) {
     console.error('DEBUG: /v1/responses endpoint failed:', error);
     throw error; // No fallback - let it fail so we can debug
@@ -265,88 +394,11 @@ async function executeOpenAI(
     messages
   });
 
-  // Process response based on endpoint used
-  let content;
-  let responseId;
-  let usage;
-  let responseModel;
-
-  if (endpoint.includes('/responses')) {
-    // /v1/responses format
-    console.log('DEBUG: Processing /v1/responses response format');
-    responseId = response.id;
-    responseModel = response.model;
-    usage = response.usage ? {
-      promptTokens: response.usage.prompt_tokens,
-      completionTokens: response.usage.completion_tokens,
-      totalTokens: response.usage.total_tokens,
-    } : undefined;
-    
-    // Extract content from /v1/responses format
-    if (response.text && response.text.content) {
-      // Structured response - check if we need to unwrap array
-      let responseContent = response.text.content;
-      
-      // If we wrapped an array schema, unwrap it
-      if (responseSchema) {
-        try {
-          const originalSchema = JSON.parse(responseSchema);
-          if (originalSchema.type === 'array' && responseContent.items) {
-            // Unwrap the array from the wrapper object
-            responseContent = responseContent.items;
-            console.log('DEBUG: Unwrapped array from /v1/responses structured response');
-          }
-        } catch (error) {
-          console.warn('DEBUG: Could not unwrap array response, using as-is');
-        }
-      }
-      
-      content = JSON.stringify(responseContent, null, 2);
-      console.log('DEBUG: Extracted structured content from /v1/responses');
-    } else if (response.text) {
-      // Regular text response
-      content = response.text;
-      console.log('DEBUG: Extracted text content from /v1/responses');
-    } else {
-      content = '';
-      console.warn('DEBUG: No content found in /v1/responses response');
-    }
-  } else {
-    // /chat/completions format (fallback)
-    console.log('DEBUG: Processing /chat/completions response format');
-    const choice = response.choices[0];
-    if (!choice) {
-      throw new Error('No response from OpenAI');
-    }
-
-    responseId = response.id;
-    responseModel = response.model;
-    usage = response.usage ? {
-      promptTokens: response.usage.prompt_tokens,
-      completionTokens: response.usage.completion_tokens,
-      totalTokens: response.usage.total_tokens,
-    } : undefined;
-
-    content = choice.message.content || '';
-    
-    // If we wrapped an array schema for chat completions, extract the array from the response
-    if (responseSchema) {
-      try {
-        const originalSchema = JSON.parse(responseSchema);
-        if (originalSchema.type === 'array') {
-          const parsed = JSON.parse(content);
-          if (parsed && parsed.items) {
-            // Extract the array from the wrapped object and stringify it
-            content = JSON.stringify(parsed.items, null, 2);
-            console.log('DEBUG: Extracted array from wrapped chat completion response');
-          }
-        }
-      } catch (error) {
-        console.warn('DEBUG: Could not unwrap array response, returning as-is');
-      }
-    }
-  }
-
+  console.log('DEBUG: Final content being returned:', content);
+  console.log('DEBUG: Content type:', typeof content);
+  console.log('DEBUG: Content length:', content?.length);
+  console.log('DEBUG: First 200 chars of content:', content?.substring(0, 200));
+  
   return {
     id: responseId,
     content,
@@ -399,18 +451,42 @@ async function executeAnthropic(
   // Add structured output via tool calling if schema is provided
   if (responseSchema) {
     try {
-      const schema = JSON.parse(responseSchema);
+      const originalSchema = JSON.parse(responseSchema);
+      let schema = originalSchema;
+      
+      console.log('DEBUG: Original schema type:', originalSchema.type);
+      console.log('DEBUG: Original schema:', JSON.stringify(originalSchema, null, 2));
+      
+      // Anthropic tool calling also requires root schema to be object type
+      // If we have an array schema, wrap it in an object
+      if (originalSchema.type === 'array') {
+        schema = {
+          type: "object",
+          properties: {
+            items: originalSchema
+          },
+          required: ["items"],
+          additionalProperties: false
+        };
+        console.log('DEBUG: Wrapped array schema in object for Anthropic');
+      }
+      
+      console.log('DEBUG: Final schema being sent to Anthropic:', JSON.stringify(schema, null, 2));
+      
+      // Generate a descriptive tool name based on the schema
+      const toolName = originalSchema.title?.toLowerCase().replace(/[^a-z0-9]/g, '_') || "structured_response";
+      const toolDescription = originalSchema.description || "Provide a structured response matching the specified schema";
+      
       requestParams.tools = [{
-        name: "structured_response",
-        description: "Provide a structured response matching the specified schema",
+        name: toolName,
+        description: toolDescription,
         input_schema: schema
       }];
       requestParams.tool_choice = {
         type: "tool",
-        name: "structured_response"
+        name: toolName
       };
       console.log('DEBUG: Added Anthropic structured output (tool calling) to request');
-      console.log('DEBUG: Schema:', schema);
     } catch (error) {
       console.warn('Invalid response schema, ignoring structured output:', error);
     }
@@ -448,11 +524,37 @@ async function executeAnthropic(
     const toolUseContent = response.content.find(c => c.type === 'tool_use');
     if (toolUseContent && 'input' in toolUseContent) {
       // Return the structured JSON response
-      responseContent = JSON.stringify(toolUseContent.input, null, 2);
+      let responseData = toolUseContent.input;
+      
+      // If we wrapped an array schema, unwrap it
+      try {
+        const originalSchema = JSON.parse(responseSchema);
+        if (originalSchema.type === 'array' && responseData && typeof responseData === 'object') {
+          // Check for common wrapper property names
+          if ('items' in responseData) {
+            responseData = (responseData as any).items;
+            console.log('DEBUG: Unwrapped array from Anthropic structured response using "items" property');
+          } else if ('classifications' in responseData) {
+            responseData = (responseData as any).classifications;
+            console.log('DEBUG: Unwrapped array from Anthropic structured response using "classifications" property');
+          } else if ('results' in responseData) {
+            responseData = (responseData as any).results;
+            console.log('DEBUG: Unwrapped array from Anthropic structured response using "results" property');
+          } else {
+            console.log('DEBUG: Array schema detected but no known wrapper property found, using response as-is');
+          }
+        }
+      } catch (error) {
+        console.warn('DEBUG: Could not unwrap array response from Anthropic, using as-is');
+      }
+      
+      responseContent = JSON.stringify(responseData, null, 2);
+      console.log('DEBUG: Extracted structured content from Anthropic tool response');
     } else {
       // Fallback to first text content
       const textContent = response.content.find(c => c.type === 'text');
       responseContent = textContent && 'text' in textContent ? textContent.text : '';
+      console.log('DEBUG: Fallback to text content from Anthropic response');
     }
   } else {
     // Regular text response

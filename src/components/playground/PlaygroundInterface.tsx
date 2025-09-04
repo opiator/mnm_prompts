@@ -482,7 +482,7 @@ export function PlaygroundInterface() {
               {result ? (
                 <div className="space-y-4">
                   <div className="bg-muted p-4 rounded-md whitespace-pre-wrap max-h-[400px] overflow-y-auto">
-                    {result.content}
+                    {typeof result.content === 'string' ? result.content : JSON.stringify(result.content, null, 2)}
                   </div>
                   
                   {result.usage && (

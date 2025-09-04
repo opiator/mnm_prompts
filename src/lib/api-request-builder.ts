@@ -85,10 +85,13 @@ function buildOpenAIRequest(config: ApiRequestConfig, processedTemplate: string)
       
       console.log('DEBUG: Final schema being sent:', JSON.stringify(schema, null, 2));
       
+      // Generate a descriptive name based on the schema
+      const responseName = originalSchema.title?.toLowerCase().replace(/[^a-z0-9]/g, '_') || "structured_response";
+      
       requestBody.text = {
         format: {
           type: "json_schema",
-          name: "structured_response", 
+          name: responseName, 
           strict: true,
           schema: schema
         }
@@ -133,17 +136,43 @@ function buildAnthropicRequest(config: ApiRequestConfig, processedTemplate: stri
   // Add structured output via tool calling if schema is provided
   if (config.responseSchema) {
     try {
-      const schema = JSON.parse(config.responseSchema);
+      const originalSchema = JSON.parse(config.responseSchema);
+      let schema = originalSchema;
+      
+      console.log('DEBUG: Original schema type:', originalSchema.type);
+      console.log('DEBUG: Original schema:', JSON.stringify(originalSchema, null, 2));
+      
+      // Anthropic tool calling also requires root schema to be object type
+      // If we have an array schema, wrap it in an object
+      if (originalSchema.type === 'array') {
+        schema = {
+          type: "object",
+          properties: {
+            items: originalSchema
+          },
+          required: ["items"],
+          additionalProperties: false
+        };
+        console.log('DEBUG: Wrapped array schema in object for Anthropic');
+      }
+      
+      console.log('DEBUG: Final schema being sent to Anthropic:', JSON.stringify(schema, null, 2));
+      
+      // Generate a descriptive tool name based on the schema
+      const toolName = originalSchema.title?.toLowerCase().replace(/[^a-z0-9]/g, '_') || "structured_response";
+      const toolDescription = originalSchema.description || "Provide a structured response matching the specified schema";
+      
       requestBody.tools = [{
-        name: "structured_response",
-        description: "Provide a structured response matching the specified schema",
+        name: toolName,
+        description: toolDescription,
         input_schema: schema
       }];
       requestBody.tool_choice = {
         type: "tool",
-        name: "structured_response"
+        name: toolName
       };
     } catch (error) {
+      console.error('DEBUG: Error parsing response schema:', error);
       // Invalid schema, ignore structured output
     }
   }
