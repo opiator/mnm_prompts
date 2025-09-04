@@ -9,6 +9,7 @@ A simplified LLM prompt management and testing platform built with Next.js, insp
 - **Datasets**: Store test data with variables for prompt testing  
 - **Playground**: Interactive testing environment with multiple LLM providers
 - **Provider Support**: OpenAI and Anthropic integration
+- **Password Protection**: Simple password-based access control
 
 ### 🚀 Key Capabilities
 - **Variable Substitution**: Use `{{variable_name}}` syntax in prompts
@@ -57,6 +58,39 @@ Open [http://localhost:3000](http://localhost:3000) with your browser.
 3. Choose a dataset to populate variables
 4. Select provider and model
 5. Click "Execute" to test
+
+## Password Protection Setup
+
+The application includes basic password protection to restrict access. To set it up:
+
+### 1. Generate a Secure Token
+Run this command to generate a secure token:
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+### 2. Create Environment Variables
+Create a `.env.local` file in your project root with:
+```bash
+# The password users will enter to access your site
+SITE_PASSWORD=your-chosen-password-here
+
+# The secure token (generated from step 1)
+AUTH_SECRET=your-generated-secret-here
+```
+
+### 3. How It Works
+- Users visiting any page will be redirected to `/login`
+- They must enter the password you set in `SITE_PASSWORD`
+- Upon successful authentication, they get a secure cookie
+- The cookie expires after 24 hours
+- Users can logout using the button in the navigation
+
+### 4. Security Notes
+- Never commit `.env.local` to version control
+- Use different passwords/tokens for development and production
+- The `AUTH_SECRET` should be at least 32 characters long
+- Consider rotating tokens periodically in production
 
 ## Technologies Used
 
