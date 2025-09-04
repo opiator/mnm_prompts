@@ -184,12 +184,7 @@ export default function DatasetDetailPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[50px]">#</TableHead>
-                  {variables.slice(0, 4).map((variable) => (
-                    <TableHead key={variable}>{variable}</TableHead>
-                  ))}
-                  {variables.length > 4 && (
-                    <TableHead>+{variables.length - 4} more</TableHead>
-                  )}
+                  <TableHead>Key</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="w-[100px]">Actions</TableHead>
                 </TableRow>
@@ -198,20 +193,11 @@ export default function DatasetDetailPage() {
                 {items.map((item, index) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">{index + 1}</TableCell>
-                    {variables.slice(0, 4).map((variable) => (
-                      <TableCell key={variable}>
-                        <div className="max-w-[200px] truncate">
-                          {String(item.data[variable] || '-')}
-                        </div>
-                      </TableCell>
-                    ))}
-                    {variables.length > 4 && (
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          View all
-                        </Badge>
-                      </TableCell>
-                    )}
+                    <TableCell>
+                      <div className="max-w-[200px]">
+                        {Object.keys(item.data).join(', ')}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {formatDate(item.createdAt)}
                     </TableCell>

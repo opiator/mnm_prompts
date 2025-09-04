@@ -15,7 +15,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Play, Settings, AlertCircle, Copy, ChevronDown, ChevronRight } from 'lucide-react';
 import { useProviders } from '@/hooks/use-providers';
 import { usePrompts } from '@/hooks/use-prompts';
@@ -48,7 +47,6 @@ export function PlaygroundInterface() {
   const [model, setModel] = useState('');
   const [selectedPrompt, setSelectedPrompt] = useState('');
   const [selectedDataset, setSelectedDataset] = useState('');
-  const [selectedDatasetItem, setSelectedDatasetItem] = useState('');
   const [manualVariables, setManualVariables] = useState<Record<string, string>>({});
   const [temperature, setTemperature] = useState(0.2);
   const [maxTokens, setMaxTokens] = useState(3000);
@@ -81,23 +79,37 @@ export function PlaygroundInterface() {
   // Get current dataset items if dataset is selected
   const datasetItems = selectedDatasetData?.items || [];
   
-  // Get variables from selected dataset item
-  const currentDatasetItem = datasetItems.find(item => item.id === selectedDatasetItem);
-  const datasetVariables = currentDatasetItem ? 
-    Object.keys(currentDatasetItem.data).reduce((acc, key) => {
-      acc[key] = String(currentDatasetItem.data[key]);
-      return acc;
-    }, {} as Record<string, string>) : {};
+  // Get variables from ALL dataset items (combine all available variables)
+  const baseDatasetVariables: Record<string, string> = {};
+  if (datasetItems.length > 0) {
+    datasetItems.forEach(item => {
+      Object.keys(item.data).forEach(key => {
+        // Use the first occurrence of each variable, or you could implement logic to merge/combine
+        if (!(key in baseDatasetVariables)) {
+          baseDatasetVariables[key] = String(item.data[key]);
+        }
+      });
+    });
+  }
 
   // Final variables = dataset + manual (manual overrides dataset only if not empty)
-  const finalVariables = { ...datasetVariables };
+  const finalVariables = { ...baseDatasetVariables };
   Object.entries(manualVariables).forEach(([key, value]) => {
     if (value && value.trim() !== '') {
-      finalVariables[key] = value;
+      finalVariables[key] = String(value);
     }
   });
 
+
+
   const handlePromptSelect = (promptId: string) => {
+    if (promptId === 'none') {
+      // Reset to default template
+      setTemplate('You are a helpful assistant. Help the user with: {{question}}');
+      setSelectedPrompt('');
+      return;
+    }
+    
     const prompt = prompts?.find(p => p.id === promptId);
     if (prompt && prompt.versions && prompt.versions[0]) {
       setTemplate(prompt.versions[0].template);
@@ -106,16 +118,15 @@ export function PlaygroundInterface() {
   };
 
   const handleDatasetChange = (datasetId: string) => {
+    if (datasetId === 'none') {
+      // Reset dataset selection
+      setSelectedDataset('');
+      setManualVariables({});
+      return;
+    }
+    
     setSelectedDataset(datasetId);
-    // Reset selected item when dataset changes
-    setSelectedDatasetItem('');
     // Clear manual variables to allow dataset values to show
-    setManualVariables({});
-  };
-
-  const handleDatasetItemChange = (itemId: string) => {
-    setSelectedDatasetItem(itemId);
-    // Clear manual variables when selecting dataset item so dataset values take precedence
     setManualVariables({});
   };
 
@@ -248,6 +259,7 @@ export function PlaygroundInterface() {
                     <SelectValue placeholder="Select a prompt..." />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
                     {prompts?.map((prompt) => (
                       <SelectItem key={prompt.id} value={prompt.id}>
                         {prompt.name}
@@ -301,70 +313,26 @@ export function PlaygroundInterface() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Dataset</Label>
-                  <Select value={selectedDataset} onValueChange={handleDatasetChange}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select dataset..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {datasets?.map((dataset) => (
-                        <SelectItem key={dataset.id} value={dataset.id}>
-                          {dataset.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Dataset Item</Label>
-                  <Select 
-                    value={selectedDatasetItem} 
-                    onValueChange={handleDatasetItemChange}
-                    disabled={!selectedDataset}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select item..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {datasetItems.map((item, index) => (
-                        <SelectItem key={item.id} value={item.id}>
-                          Item {index + 1}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div>
+                <Label>Dataset</Label>
+                <Select value={selectedDataset} onValueChange={handleDatasetChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select dataset..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {datasets?.map((dataset) => (
+                      <SelectItem key={dataset.id} value={dataset.id}>
+                        {dataset.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
-              {variables.length > 0 && (
-                <>
-                  <Separator />
 
-                  <div>
-                    <Label>Variable Values</Label>
-                    <div className="space-y-2 mt-2">
-                      {variables.map((variable) => (
-                        <div key={variable}>
-                          <Label className="text-sm">{variable}</Label>
-                          <Textarea
-                            value={manualVariables[variable] || ''}
-                            onChange={(e) => setManualVariables(prev => ({
-                              ...prev,
-                              [variable]: e.target.value
-                            }))}
-                            placeholder={datasetVariables[variable] || `Enter ${variable}...`}
-                            className="min-h-[80px] max-h-[200px] resize-none overflow-y-auto"
-                            rows={3}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
+
+
 
               {variables.length === 0 && (
                 <div className="text-center py-4 text-muted-foreground">
@@ -470,6 +438,13 @@ export function PlaygroundInterface() {
               <div className="bg-muted p-4 rounded-md font-mono text-sm whitespace-pre-wrap max-h-[300px] overflow-y-auto">
                 {substituteVariables(template, finalVariables)}
               </div>
+
+              {selectedDataset && datasetItems.length > 0 && (
+                <div className="mt-3 text-xs text-muted-foreground">
+                  Using dataset "{selectedDatasetData?.name}" with {datasetItems.length} item{datasetItems.length !== 1 ? 's' : ''}
+                </div>
+              )}
+
             </CardContent>
           </Card>
 
