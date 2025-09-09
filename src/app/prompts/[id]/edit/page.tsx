@@ -84,6 +84,7 @@ export default function PromptEditPage() {
         versionForm.reset({
           template: currentVersion.template,
           changeDescription: '',
+          responseSchema: currentVersion.responseSchema || '',
         });
       }
     }

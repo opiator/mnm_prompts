@@ -101,3 +101,76 @@ export async function POST(
     );
   }
 }
+
+// DELETE /api/prompts/[id]/versions - Delete a specific version
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const url = new URL(request.url);
+    const versionId = url.searchParams.get('versionId');
+
+    if (!versionId) {
+      return NextResponse.json(
+        { error: 'Version ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // First check if the prompt exists
+    const prompt = await prisma.prompt.findUnique({
+      where: { id },
+    });
+
+    if (!prompt) {
+      return NextResponse.json(
+        { error: 'Prompt not found' },
+        { status: 404 }
+      );
+    }
+
+    // Check if this is the only version (we don't want to delete the last version)
+    const versionCount = await prisma.promptVersion.count({
+      where: { promptId: id },
+    });
+
+    if (versionCount <= 1) {
+      return NextResponse.json(
+        { error: 'Cannot delete the last version of a prompt' },
+        { status: 400 }
+      );
+    }
+
+    // Delete the specific version
+    await prisma.promptVersion.delete({
+      where: { 
+        id: versionId,
+        promptId: id 
+      },
+    });
+
+    // Update prompt's updatedAt
+    await prisma.prompt.update({
+      where: { id },
+      data: { updatedAt: new Date() },
+    });
+
+    return NextResponse.json({ message: 'Version deleted successfully' });
+  } catch (error: any) {
+    console.error('Error deleting prompt version:', error);
+
+    if (error.code === 'P2025') {
+      return NextResponse.json(
+        { error: 'Version not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to delete prompt version' },
+      { status: 500 }
+    );
+  }
+}

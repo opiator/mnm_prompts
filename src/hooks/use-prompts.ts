@@ -163,3 +163,47 @@ export function useCreatePromptVersion() {
     },
   });
 }
+
+// Fetch a specific prompt version
+export function usePromptVersion(promptId: string, versionId: string) {
+  return useQuery<PromptVersion>({
+    queryKey: ['prompts', promptId, 'versions', versionId],
+    queryFn: async () => {
+      const response = await fetch(`/api/prompts/${promptId}/versions/${versionId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch prompt version');
+      }
+      return response.json();
+    },
+    enabled: !!promptId && !!versionId,
+  });
+}
+
+// Delete a prompt version
+export function useDeletePromptVersion() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ 
+      promptId, 
+      versionId 
+    }: { 
+      promptId: string; 
+      versionId: string 
+    }): Promise<void> => {
+      const response = await fetch(`/api/prompts/${promptId}/versions?versionId=${versionId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete prompt version');
+      }
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['prompts'] });
+      queryClient.invalidateQueries({ queryKey: ['prompts', variables.promptId] });
+      queryClient.invalidateQueries({ queryKey: ['prompts', variables.promptId, 'versions'] });
+    },
+  });
+}

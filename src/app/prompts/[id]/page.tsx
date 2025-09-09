@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Edit, Plus, Play, Copy, Calendar, Hash, Tag } from 'lucide-react';
+import { ArrowLeft, Edit, Plus, Play, Copy, Calendar, Hash, Tag, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { usePrompt } from '@/hooks/use-prompts';
+import { usePrompt, useDeletePromptVersion } from '@/hooks/use-prompts';
 import { formatDate, extractVariables } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -24,6 +24,7 @@ export default function PromptDetailPage() {
   const promptId = params.id as string;
   
   const { data: prompt, isLoading, error } = usePrompt(promptId);
+  const deleteVersionMutation = useDeletePromptVersion();
 
   const handleCopyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -33,6 +34,22 @@ export default function PromptDetailPage() {
   const handleTestInPlayground = () => {
     // Navigate to playground with this prompt pre-selected
     window.location.href = `/playground?prompt=${promptId}`;
+  };
+
+  const handleDeleteVersion = async (versionId: string) => {
+    if (!confirm('Are you sure you want to delete this version? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await deleteVersionMutation.mutateAsync({
+        promptId,
+        versionId,
+      });
+      toast.success('Version deleted successfully');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete version');
+    }
   };
 
   if (error) {
@@ -281,13 +298,26 @@ export default function PromptDetailPage() {
                       {formatDate(version.createdAt)}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleCopyToClipboard(version.template)}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCopyToClipboard(version.template)}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        {prompt.versions && prompt.versions.length > 1 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteVersion(version.id)}
+                            disabled={deleteVersionMutation.isPending}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
