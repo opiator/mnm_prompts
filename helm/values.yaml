@@ -56,7 +56,7 @@ healthcheck:
 
 # Secrets - set these values
 secrets:
-  DATABASE_URL: ""
+  DATABASE_URL: "file:/data/prod.db"
 
 # AWS configuration
 aws:
@@ -66,3 +66,13 @@ aws:
     appSecrets: ""
   serviceAccount:
     roleArn: ""
+
+# Persistence for SQLite (disabled by default)
+persistence:
+  enabled: false
+  storageClassName: ""
+  accessModes:
+    - ReadWriteOnce
+  size: 1Gi
+  mountPath: /data
+  subPath: ""

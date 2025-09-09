@@ -16,6 +16,7 @@ export interface PromptVersion {
   commit: string;
   changeDescription?: string;
   metadata?: Record<string, any>;
+  responseSchema?: string;
   createdAt: Date;
 }
 

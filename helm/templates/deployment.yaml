@@ -14,19 +14,37 @@ spec:
       labels:
         app: {{ .Chart.Name }}
     spec:
+      {{- if .Values.persistence.enabled }}
+      securityContext:
+        fsGroup: 1001
+      {{- end }}
       serviceAccountName: {{ .Chart.Name }}
-      containers:
-      - name: {{ .Chart.Name }}
+      {{- if .Values.persistence.enabled }}
+      initContainers:
+      - name: migrate
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
-        ports:
-        - containerPort: 3000
+        command: ["/bin/bash","-lc"]
+        args:
+          - |
+            set -euo pipefail
+            export HOME=/tmp
+            export NPM_CONFIG_CACHE=/tmp/.npm
+            mkdir -p "$NPM_CONFIG_CACHE"
+            if command -v npm >/dev/null 2>&1; then
+              npm exec -y prisma@6.15.0 migrate deploy
+            elif command -v npx >/dev/null 2>&1; then
+              npx prisma@6.15.0 migrate deploy
+            else
+              echo "npm/npx not found; cannot run prisma migrate" >&2
+              exit 1
+            fi
         env:
         {{- range $key, $value := .Values.env }}
         - name: {{ $key }}
           value: {{ $value | quote }}
         {{- end }}
-        {{- if .Values.secrets }}
+        {{- if and .Values.secrets (not .Values.aws.secretsManager.enabled) }}
         {{- range $key, $value := .Values.secrets }}
         {{- if $value }}
         - name: {{ $key }}
@@ -41,6 +59,48 @@ spec:
         envFrom:
         - secretRef:
             name: {{ .Chart.Name }}-app-secrets
+        {{- end }}
+        volumeMounts:
+        - name: data
+          mountPath: {{ .Values.persistence.mountPath }}
+          {{- if .Values.persistence.subPath }}
+          subPath: {{ .Values.persistence.subPath }}
+          {{- end }}
+      {{- end }}
+      containers:
+      - name: {{ .Chart.Name }}
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: 3000
+        env:
+        {{- range $key, $value := .Values.env }}
+        - name: {{ $key }}
+          value: {{ $value | quote }}
+        {{- end }}
+        {{- if and .Values.secrets (not .Values.aws.secretsManager.enabled) }}
+        {{- range $key, $value := .Values.secrets }}
+        {{- if $value }}
+        - name: {{ $key }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ $.Chart.Name }}-secrets
+              key: {{ $key }}
+        {{- end }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.aws.secretsManager.enabled }}
+        envFrom:
+        - secretRef:
+            name: {{ .Chart.Name }}-app-secrets
+        {{- end }}
+        {{- if .Values.persistence.enabled }}
+        volumeMounts:
+        - name: data
+          mountPath: {{ .Values.persistence.mountPath }}
+          {{- if .Values.persistence.subPath }}
+          subPath: {{ .Values.persistence.subPath }}
+          {{- end }}
         {{- end }}
         livenessProbe:
           httpGet:
@@ -72,3 +132,13 @@ spec:
           timeoutSeconds: {{ .Values.healthcheck.startup.timeoutSeconds }}
           successThreshold: {{ .Values.healthcheck.startup.successThreshold }}
           failureThreshold: {{ .Values.healthcheck.startup.failureThreshold }}
+      {{- if .Values.persistence.enabled }}
+      volumes:
+      - name: data
+        {{- if .Values.persistence.storageClassName }}
+        persistentVolumeClaim:
+          claimName: {{ .Chart.Name }}-data
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
+      {{- end }}

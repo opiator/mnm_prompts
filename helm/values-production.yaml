@@ -8,7 +8,7 @@ image:
   tag: latest
   pullPolicy: Always
 
-replicas: 2
+replicas: 1
 
 service:
   type: ClusterIP
@@ -27,6 +27,8 @@ env:
   PORT: "3000"
   HOSTNAME: "0.0.0.0"
   NEXT_TELEMETRY_DISABLED: "1"    # Add your public environment variables here
+  NEXT_PUBLIC_SITE_URL: "https://prompts.mnm.dev"
+  DATABASE_URL: "file:/data/prod.db"
 
 # Health check configuration
 healthcheck:
@@ -59,23 +61,23 @@ healthcheck:
 # Resource limits for production
 resources:
   limits:
-    cpu: 1000m
-    memory: 1Gi
-  requests:
     cpu: 500m
     memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
 
 # Horizontal Pod Autoscaler configuration
 autoscaling:
   enabled: true
-  minReplicas: 2
-  maxReplicas: 2
+  minReplicas: 1
+  maxReplicas: 1
   targetCPUUtilizationPercentage: 70
   targetMemoryUtilizationPercentage: 80
 
 # Pod disruption budget
 podDisruptionBudget:
-  enabled: true
+  enabled: false
   minAvailable: 2
 
 
@@ -86,3 +88,13 @@ aws:
     appSecrets: mnm-prompts-prod-secrets
   serviceAccount:
     roleArn: arn:aws:iam::767624311656:role/mnm-prompts-secrets-role 
+
+
+persistence:
+  enabled: true
+  storageClassName: gp2
+  accessModes:
+    - ReadWriteOnce
+  size: 1Gi
+  mountPath: /data
+  subPath: ""
