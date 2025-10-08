@@ -33,6 +33,7 @@ const OPENAI_MODELS = [
 ];
 
 const ANTHROPIC_MODELS = [
+  'claude-sonnet-4-5-20250929',
   'claude-3-5-sonnet-20241022',
   'claude-3-5-haiku-20241022',
   'claude-3-opus-20240229',
@@ -163,6 +164,10 @@ export function PlaygroundInterface() {
     // Generate the exact API request that will be made to OpenAI/Anthropic
     const providerConfig = providers?.find(p => p.provider === provider);
     
+    // Get the responseSchema from the selected prompt
+    const selectedPromptData = prompts?.find(p => p.id === selectedPrompt);
+    const responseSchema = selectedPromptData?.versions?.[0]?.responseSchema || null;
+    
     let rawRequest;
     if (providerConfig) {
       try {
@@ -180,7 +185,8 @@ export function PlaygroundInterface() {
             baseUrl: providerConfig.baseUrl,
             apiKey: providerConfig.apiKey,
             headers: providerConfig.headers
-          }
+          },
+          responseSchema
         });
       } catch (error) {
         console.error('Failed to build API request preview:', error);

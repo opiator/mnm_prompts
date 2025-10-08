@@ -62,22 +62,33 @@ export async function POST(
     // Generate commit hash (simplified)
     const commit = Math.random().toString(36).substring(2, 9);
 
-    const version = await prisma.promptVersion.create({
-      data: {
-        promptId: id,
-        template,
-        commit,
-        changeDescription,
-        metadata: metadata ? JSON.stringify(metadata) : null,
-        responseSchema,
-      },
-    });
+    // Perform write operations in a single transaction to reduce SQLite locking issues
+    const version = await prisma.$transaction(
+      async (tx) => {
+        const created = await tx.promptVersion.create({
+          data: {
+            promptId: id,
+            template,
+            commit,
+            changeDescription,
+            metadata: metadata ? JSON.stringify(metadata) : null,
+            responseSchema,
+          },
+        });
 
-    // Update prompt's updatedAt
-    await prisma.prompt.update({
-      where: { id },
-      data: { updatedAt: new Date() },
-    });
+        await tx.prompt.update({
+          where: { id },
+          data: { updatedAt: new Date() },
+        });
+
+        return created;
+      },
+      {
+        // Increase wait/timeout to handle brief locks during concurrent writes
+        maxWait: 10000, // ms to wait for a transaction slot
+        timeout: 30000, // ms total before timing out
+      }
+    );
 
     const versionWithParsedData = {
       ...version,

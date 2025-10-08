@@ -445,7 +445,8 @@ async function executeAnthropic(
     messages: requestMessages as Anthropic.MessageParam[],
     max_tokens: config.maxTokens ?? 1000,
     temperature: config.temperature ?? 0.7,
-    top_p: config.topP ?? 1,
+    // Note: Anthropic Claude models don't allow both temperature and top_p
+    // Only temperature is used
   };
 
   // Add structured output via tool calling if schema is provided
@@ -505,7 +506,7 @@ async function executeAnthropic(
     config: {
       temperature: config.temperature ?? 0.7,
       maxTokens: config.maxTokens ?? 1000,
-      topP: config.topP ?? 1
+      // topP is not used for Anthropic as they don't allow both temperature and top_p
     },
     providerConfig: {
       baseUrl: providerConfig.baseUrl || undefined,
