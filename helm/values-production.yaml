@@ -28,7 +28,8 @@ env:
   HOSTNAME: "0.0.0.0"
   NEXT_TELEMETRY_DISABLED: "1"    # Add your public environment variables here
   NEXT_PUBLIC_SITE_URL: "https://prompts.mnm.dev"
-  DATABASE_URL: "file:/data/prod.db"
+  # DATABASE_URL should be set via AWS Secrets Manager
+  # For Supabase, format: postgresql://postgres:[password]@[host]:6543/postgres?pgbouncer=true
 
 # Health check configuration
 healthcheck:

@@ -1,0 +1,40 @@
+version: 1.0
+runtime: nodejs20
+
+build:
+  commands:
+    build:
+      - npm ci
+      - npx prisma generate
+      - npm run build
+
+run:
+  runtime-version: 20
+  command: sh -c "npx prisma migrate deploy && node server.js"
+  network:
+    port: 3000
+    env: PORT
+  env:
+    - name: NODE_ENV
+      value: production
+    - name: PORT
+      value: "3000"
+    - name: HOSTNAME
+      value: "0.0.0.0"
+    - name: NEXT_TELEMETRY_DISABLED
+      value: "1"
+  secrets:
+    - name: DATABASE_URL
+      value-from: "arn:aws:secretsmanager:eu-west-1:767624311656:secret:mnm-prompts-prod-secrets:DATABASE_URL::"
+    - name: SITE_PASSWORD
+      value-from: "arn:aws:secretsmanager:eu-west-1:767624311656:secret:mnm-prompts-prod-secrets:SITE_PASSWORD::"
+    - name: AUTH_SECRET
+      value-from: "arn:aws:secretsmanager:eu-west-1:767624311656:secret:mnm-prompts-prod-secrets:AUTH_SECRET::"
+
+health-check:
+  protocol: http
+  path: /api/healthcheck
+  interval: 5
+  timeout: 2
+  healthy-threshold: 1
+  unhealthy-threshold: 3
