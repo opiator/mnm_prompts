@@ -1,4 +1,4 @@
-// This is your Prisma schema file,
+// This is your Prisma schema file for SQLite (local development),
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -18,7 +18,7 @@ model Prompt {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   versions    PromptVersion[]
-  
+
   @@map("prompts")
 }
 
@@ -31,9 +31,9 @@ model PromptVersion {
   metadata         String?  // JSON string
   responseSchema   String?  // JSON schema for structured output
   createdAt        DateTime @default(now())
-  
+
   prompt    Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
-  
+
   @@unique([promptId, commit])
   @@map("prompt_versions")
 }
@@ -46,7 +46,7 @@ model Dataset {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   items       DatasetItem[]
-  
+
   @@map("datasets")
 }
 
@@ -55,9 +55,9 @@ model DatasetItem {
   datasetId String
   data      String   // JSON string
   createdAt DateTime @default(now())
-  
+
   dataset   Dataset  @relation(fields: [datasetId], references: [id], onDelete: Cascade)
-  
+
   @@map("dataset_items")
 }
 
@@ -69,6 +69,6 @@ model ProviderKey {
   baseUrl   String?
   headers   String?  // JSON string for additional headers
   createdAt DateTime @default(now())
-  
+
   @@map("provider_keys")
 }
